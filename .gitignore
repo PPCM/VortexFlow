@@ -1,0 +1,337 @@
+# VortexFlow - .gitignore
+# Application web de visualisation 3D de graphiques DOT
+
+# =====================================
+# Variables d'environnement et secrets
+# =====================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+*.env.*
+!.env.example
+
+# Fichiers de configuration sensibles
+config/database.json
+config/redis.json
+config/secrets.json
+
+# =====================================
+# Node.js Backend
+# =====================================
+# Dépendances
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime et caches
+.npm
+.node_repl_history
+*.tgz
+*.tar.gz
+
+# Couverture de tests
+coverage/
+.nyc_output/
+
+# Fichiers de build
+dist/
+build/
+
+# =====================================
+# Frontend React (futur)
+# =====================================
+# Build React
+frontend/build/
+frontend/dist/
+
+# Caches frontend
+frontend/.eslintcache
+frontend/.parcel-cache/
+
+# =====================================
+# Base de données et données
+# =====================================
+# PostgreSQL
+*.sql
+*.db
+*.sqlite
+*.sqlite3
+database/
+db/
+
+# Dumps et backups
+*.dump
+*.backup
+*.bak
+
+# =====================================
+# Redis et cache
+# =====================================
+# Fichiers Redis
+dump.rdb
+*.rdb
+redis.conf
+redis-server.log
+
+# Cache général
+.cache/
+*.cache
+
+# =====================================
+# Logs et monitoring
+# =====================================
+# Logs application
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Logs système
+/var/log/
+access.log
+error.log
+combined.log
+app.log
+
+# Logs PM2
+.pm2/
+
+# =====================================
+# Uploads et fichiers temporaires
+# =====================================
+# Fichiers uploadés
+backend/uploads/*
+uploads/*
+tmp/
+temp/
+*.tmp
+
+# Fichiers de session et cookies
+backend/cookies.txt
+backend/*cookies*.txt
+session-store/
+
+# =====================================
+# Docker et conteneurs
+# =====================================
+# Volumes Docker
+docker-volumes/
+.docker/
+
+# =====================================
+# Développement et IDE
+# =====================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# =====================================
+# Système d'exploitation
+# =====================================
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# =====================================
+# Tests et debugging
+# =====================================
+# Jest
+jest_html_reporters.html
+coverage/
+
+# Cypress
+cypress/videos/
+cypress/screenshots/
+
+# Playwright
+test-results/
+playwright-report/
+
+# Debug et profiling
+*.heapsnapshot
+*.cpuprofile
+
+# =====================================
+# Documentation générée
+# =====================================
+# JSDoc
+docs/generated/
+out/
+
+# TypeDoc
+typedoc/
+
+# =====================================
+# Déploiement et CI/CD
+# =====================================
+# Déploiement
+.deploy/
+.serverless/
+
+# GitHub Actions
+.github/workflows/secrets/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# =====================================
+# Archives et packages
+# =====================================
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# =====================================
+# Monitoring et métriques
+# =====================================
+# Prometheus
+prometheus_data/
+
+# Grafana
+grafana_data/
+
+# =====================================
+# SSL et certificats
+# =====================================
+*.pem
+*.key
+*.crt
+*.cert
+ssl/
+certs/
+
+# =====================================
+# Fichiers temporaires VortexFlow
+# =====================================
+# Scripts de test temporaires
+test-*.js
+temp-*.js
+debug-*.js
+
+# Exports temporaires
+export-*.dot
+export-*.json
+export-*.zip
+
+# Sessions et authentification temporaires
+session-*.json
+auth-*.json
+
+# =====================================
+# Performance et profiling
+# =====================================
+# Profiling V8
+isolate-*-v8.log
+*.heapdump
+
+# Lighthouse reports
+lighthouse-*.html
+lighthouse-*.json
+
+# Bundle analyzer
+stats.json
+bundlesize.json
+
+# =====================================
+# Outils de développement
+# =====================================
+# ESLint
+.eslintcache
+
+# Prettier
+.prettierignore
+
+# TypeScript
+*.tsbuildinfo
+
+# Webpack
+.webpack/
+
+# Rollup
+.rollup.cache/
+
+# =====================================
+# Variables spécifiques VortexFlow
+# =====================================
+# Configuration Redis personnalisée
+redis-local.conf
+
+# Graphiques de test temporaires
+test-graphs/
+sample-graphs/
+demo-graphs/
+
+# Simulations sauvegardées temporaires
+simulations/
+temp-simulations/
+
+# =====================================
+# Exclusions importantes
+# =====================================
+# Garder certains fichiers importants
+!backend/docs/
+!backend/scripts/
+!.env.example
+!docker-compose.yml
+!README.md
+!LICENCE
+!package.json
+!package-lock.json
+
+# =====================================
+# Notes de développement
+# =====================================
+# Notes personnelles
+NOTES.md
+TODO.md
+CHANGELOG.md.local
+notes/
