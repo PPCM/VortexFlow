@@ -78,12 +78,40 @@ class ApiService {
   // =====================================
   async login(credentials: LoginCredentials): Promise<ApiResponse<User>> {
     const response = await this.client.post('/auth/login', credentials);
-    return response.data;
+    
+    // Adapter la réponse du backend au format ApiResponse attendu
+    if (response.data && response.data.user) {
+      return {
+        success: true,
+        data: response.data.user,
+        message: response.data.message || 'Login successful'
+      };
+    } else {
+      return {
+        success: false,
+        data: null as any,
+        message: response.data.message || 'Login failed'
+      };
+    }
   }
 
   async register(userData: RegisterData): Promise<ApiResponse<User>> {
     const response = await this.client.post('/auth/register', userData);
-    return response.data;
+    
+    // Adapter la réponse du backend au format ApiResponse attendu
+    if (response.data && response.data.user) {
+      return {
+        success: true,
+        data: response.data.user,
+        message: response.data.message || 'Registration successful'
+      };
+    } else {
+      return {
+        success: false,
+        data: null as any,
+        message: response.data.message || 'Registration failed'
+      };
+    }
   }
 
   async logout(): Promise<ApiResponse<void>> {
