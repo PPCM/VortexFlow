@@ -8,6 +8,7 @@ import { ThemeProvider, createTheme, CssBaseline, Box, Typography } from '@mui/m
 // Providers globaux
 import { AuthProvider } from './context/AuthContext';
 import { GraphProvider } from './context/GraphContext';
+import { SimulationProvider } from './context/SimulationContext';
 import { NotificationProvider } from './components/common/NotificationProvider';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
@@ -213,7 +214,8 @@ const App: React.FC = () => {
         <Router>
           <AuthProvider>
             <GraphProvider>
-              <NotificationProvider>
+              <SimulationProvider>
+                <NotificationProvider>
                 <AppLayout>
                   <Routes>
                     {/* Routes publiques */}
@@ -348,7 +350,8 @@ const App: React.FC = () => {
                     />
                   </Routes>
                 </AppLayout>
-              </NotificationProvider>
+                </NotificationProvider>
+              </SimulationProvider>
             </GraphProvider>
           </AuthProvider>
         </Router>

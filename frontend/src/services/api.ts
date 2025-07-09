@@ -280,30 +280,67 @@ class ApiService {
   }
 
   // =====================================
-  // Méthodes Simulation
+  // Méthodes Dashboard
   // =====================================
-  async startSimulation(graphId: number, config: any): Promise<ApiResponse<any>> {
-    const response = await this.client.post(`/simulation/start/${graphId}`, config);
+  async getDashboardStats(): Promise<ApiResponse<{
+    totalGraphs: number;
+    activeSimulations: number;
+    totalUsers: number;
+    recentActivity: number;
+  }>> {
+    const response = await this.client.get('/dashboard/stats');
     return response.data;
   }
 
-  async stopSimulation(graphId: number): Promise<ApiResponse<any>> {
-    const response = await this.client.post(`/simulation/stop/${graphId}`);
+  // =====================================
+  // Méthodes Simulation
+  // ====================================
+  async getSimulationSessions(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    graphId?: string;
+  }): Promise<ApiResponse<any>> {
+    const response = await this.client.get('/simulation/sessions', { params });
     return response.data;
   }
 
-  async pauseSimulation(graphId: number): Promise<ApiResponse<any>> {
-    const response = await this.client.post(`/simulation/pause/${graphId}`);
+  async getSimulationSession(sessionId: string): Promise<ApiResponse<any>> {
+    const response = await this.client.get(`/simulation/sessions/${sessionId}`);
     return response.data;
   }
 
-  async getSimulationStatus(graphId: number): Promise<ApiResponse<any>> {
-    const response = await this.client.get(`/simulation/status/${graphId}`);
+  async startSimulation(data: {
+    graphId: string;
+    sessionName?: string;
+    config?: any;
+  }): Promise<ApiResponse<any>> {
+    const response = await this.client.post('/simulation/start', data);
     return response.data;
   }
 
-  async updateSimulationConfig(graphId: number, config: any): Promise<ApiResponse<any>> {
-    const response = await this.client.patch(`/simulation/config/${graphId}`, config);
+  async stopSimulation(sessionId: string): Promise<ApiResponse<any>> {
+    const response = await this.client.post(`/simulation/${sessionId}/stop`);
+    return response.data;
+  }
+
+  async pauseSimulation(sessionId: string): Promise<ApiResponse<any>> {
+    const response = await this.client.post(`/simulation/${sessionId}/pause`);
+    return response.data;
+  }
+
+  async resumeSimulation(sessionId: string): Promise<ApiResponse<any>> {
+    const response = await this.client.post(`/simulation/${sessionId}/resume`);
+    return response.data;
+  }
+
+  async getSimulationTemplates(): Promise<ApiResponse<any>> {
+    const response = await this.client.get('/simulation/templates');
+    return response.data;
+  }
+
+  async validateSimulationConfig(config: any): Promise<ApiResponse<any>> {
+    const response = await this.client.post('/simulation/validate-config', config);
     return response.data;
   }
 

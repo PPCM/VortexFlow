@@ -18,6 +18,8 @@ const publicRoutes = require('./src/routes/public');
 const graphRoutes = require('./src/routes/graphs');
 const userRoutes = require('./src/routes/users');
 const simulationRoutes = require('./src/routes/simulation');
+const dashboardRoutes = require('./src/routes/dashboard');
+const adminRoutes = require('./src/routes/admin');
 const systemRoutes = require('./src/routes/system');
 const importExportRoutes = require('./src/routes/import-export');
 const SimulationHandler = require('./src/websocket/simulationHandler');
@@ -143,6 +145,8 @@ app.use('/api/public', publicRoutes);
 app.use('/api/graphs', validateSession, graphRoutes);
 app.use('/api/users', validateSession, userRoutes);
 app.use('/api/simulation', validateSession, simulationRoutes);
+app.use('/api/dashboard', validateSession, dashboardRoutes);
+app.use('/api/admin', adminRoutes);
 // Health check endpoint (public) - must be before protected routes
 app.get('/api/system/health', (req, res, next) => {
   // Forward to the health endpoint without auth
@@ -161,7 +165,7 @@ app.use(errorHandler);
 
 // Database connection and server startup
 const PORT = process.env.PORT || 5000;
-const HOST = process.env.HOST || 'localhost';
+const HOST = process.env.HOST || '0.0.0.0'; // Bind to all IPv4 interfaces
 
 async function startServer() {
   try {

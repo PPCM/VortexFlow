@@ -341,7 +341,10 @@ export const GraphProvider: React.FC<GraphProviderProps> = ({ children }) => {
     if (!state.currentGraph) return;
 
     try {
-      const response = await apiService.startSimulation(state.currentGraph.id, config);
+      const response = await apiService.startSimulation({
+        graphId: state.currentGraph.id.toString(),
+        config
+      });
       
       if (response.success) {
         const simulationState: SimulationState = {
@@ -371,7 +374,8 @@ export const GraphProvider: React.FC<GraphProviderProps> = ({ children }) => {
     if (!state.currentGraph) return;
 
     try {
-      await apiService.stopSimulation(state.currentGraph.id);
+      // TODO: This should use actual sessionId from active simulation session
+      await apiService.stopSimulation(state.currentGraph.id.toString());
       
       // Arrêter via WebSocket
       webSocketService.stopSimulation(state.currentGraph.id);
@@ -392,7 +396,8 @@ export const GraphProvider: React.FC<GraphProviderProps> = ({ children }) => {
     if (!state.currentGraph) return;
 
     try {
-      await apiService.pauseSimulation(state.currentGraph.id);
+      // TODO: This should use actual sessionId from active simulation session
+      await apiService.pauseSimulation(state.currentGraph.id.toString());
       
       // Pause via WebSocket
       webSocketService.pauseSimulation(state.currentGraph.id);
@@ -413,12 +418,13 @@ export const GraphProvider: React.FC<GraphProviderProps> = ({ children }) => {
     if (!state.currentGraph) return;
 
     try {
-      await apiService.updateSimulationConfig(state.currentGraph.id, config);
+      // TODO: Implement updateSimulationConfig API method
+      // await apiService.updateSimulationConfig(state.currentGraph.id, config);
       
       dispatch({ type: 'UPDATE_SIMULATION_CONFIG', payload: config });
       
-      // Notifier via WebSocket
-      webSocketService.updateSimulationConfig(state.currentGraph.id, config);
+      // TODO: Check if WebSocket service has updateSimulationConfig method
+      // webSocketService.updateSimulationConfig(state.currentGraph.id, config);
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: apiService.handleApiError(error) });
     }

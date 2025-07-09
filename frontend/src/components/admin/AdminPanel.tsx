@@ -1,13 +1,21 @@
-// VortexFlow Frontend - Panneau d'Administration
-// Interface de gestion des utilisateurs et du système
+/**
+ * VortexFlow Frontend - Panneau d'Administration
+ * Interface moderne de gestion administrative du système VortexFlow
+ */
 
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Grid,
   Card,
   CardContent,
   Typography,
+  Tabs,
+  Tab,
+  Alert,
+  LinearProgress,
+  Avatar,
+  Button,
+  Chip,
   Table,
   TableBody,
   TableCell,
@@ -15,63 +23,51 @@ import {
   TableHead,
   TableRow,
   Paper,
-  IconButton,
-  Button,
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Pagination,
   TextField,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Alert,
-  Tabs,
-  Tab,
-  LinearProgress,
-  Avatar,
-  Menu,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Divider,
+  Snackbar,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import {
-  Edit,
-  Delete,
-  Block,
-  CheckCircle,
-  Warning,
-  Error,
-  People,
-  Storage,
-  Timeline,
-  Security,
-  MoreVert,
-  Refresh,
-  Download,
-  Upload,
-  Settings,
-  Visibility,
-  AdminPanelSettings,
-  PlayArrow,
-  HealthAndSafety,
+  Dashboard as DashboardIcon,
+  People as PeopleIcon,
+  Storage as StorageIcon,
+  PlayArrow as PlayIcon,
+  Timeline as TimelineIcon,
+  Settings as SettingsIcon,
+  Refresh as RefreshIcon,
+  Edit as EditIcon,
+  Block as BlockIcon,
+  Person as PersonIcon
 } from '@mui/icons-material';
-import { useAuth } from '../../context/AuthContext';
-import apiService from '../../services/api';
-import { User, SystemStats, SystemLogs } from '../../types';
-import LoadingPage from '../common/LoadingPage';
 
+import { 
+  adminService, 
+  AdminStats,
+  UserWithStats,
+  GraphWithStats,
+  SimulationWithDetails,
+  ActivityLogEntry,
+  SystemInfo,
+  PaginatedResponse
+} from '../../services/adminService';
+
+// Import CSS personnalisé
+import './AdminPanel.css';
+
+// Interface pour les panneaux d'onglets
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
   value: number;
 }
 
-const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
+function TabPanel({ children, value, index }: TabPanelProps) {
   return (
     <div
       role="tabpanel"
@@ -79,506 +75,748 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
       id={`admin-tabpanel-${index}`}
       aria-labelledby={`admin-tab-${index}`}
     >
-      {value === index && <Box>{children}</Box>}
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
     </div>
   );
-};
+}
 
 const AdminPanel: React.FC = () => {
-  const { state } = useAuth();
-  const canAdmin = () => state.user?.role === 'admin';
-
-  // États locaux
-  const [currentTab, setCurrentTab] = useState(0);
+  // État principal
+  const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // Données
-  const [users, setUsers] = useState<User[]>([]);
-  const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
-  const [systemLogs, setSystemLogs] = useState<SystemLogs[]>([]);
-
-  // Dialogs et menus
-  const [userDialogOpen, setUserDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-
-  // Données du formulaire utilisateur
-  const [userFormData, setUserFormData] = useState({
-    username: '',
-    email: '',
-    role: 'viewer' as 'viewer' | 'editor' | 'admin',
-    is_active: true,
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [snackbar, setSnackbar] = useState({ 
+    open: false, 
+    message: '', 
+    severity: 'info' as 'success' | 'error' | 'info' | 'warning' 
   });
 
-  // =====================================
-  // Effets (appelés avant toute condition)
-  // =====================================
+  // États des données
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [users, setUsers] = useState<PaginatedResponse<UserWithStats> | null>(null);
+  const [graphs, setGraphs] = useState<PaginatedResponse<GraphWithStats> | null>(null);
+  const [simulations, setSimulations] = useState<PaginatedResponse<SimulationWithDetails> | null>(null);
+  const [activities, setActivities] = useState<PaginatedResponse<ActivityLogEntry> | null>(null);
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+
+  // États des filtres et pagination
+  const [userFilters, setUserFilters] = useState({ 
+    page: 1, 
+    search: '', 
+    role: '', 
+    status: undefined as 'active' | 'inactive' | undefined
+  });
+
+  // Chargement initial
   useEffect(() => {
-    if (canAdmin()) {
-      loadAdminData();
-    }
-  }, [canAdmin]);
+    loadStats();
+  }, []);
 
-  // =====================================
-  // Vérification des permissions
-  // =====================================
-  if (!canAdmin()) {
-    return (
-      <Box sx={{ textAlign: 'center', mt: 8 }}>
-        <AdminPanelSettings sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-        <Typography variant="h6" color="error">
-          Accès non autorisé
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Vous n'avez pas les permissions pour accéder au panneau d'administration.
-        </Typography>
-      </Box>
-    );
-  }
+  useEffect(() => {
+    if (activeTab === 1) loadUsers();
+    else if (activeTab === 2) loadGraphs();
+    else if (activeTab === 3) loadSimulations();
+    else if (activeTab === 4) loadActivities();
+    else if (activeTab === 5) loadSystemInfo();
+  }, [activeTab, userFilters]);
 
-  // =====================================
   // Fonctions de chargement des données
-  // =====================================
-  const loadAdminData = async () => {
-    setLoading(true);
+  const loadStats = async () => {
     try {
-      const [usersData, statsData, logsData] = await Promise.all([
-        apiService.getUsers(),
-        apiService.getSystemStats(),
-        apiService.getSystemLogs('50'),
-      ]);
-      
-      setUsers(usersData.data.data);
-      setSystemStats(statsData.data);
-      setSystemLogs(logsData.data);
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Erreur lors du chargement des données' });
+      setLoading(true);
+      setError(null);
+      const data = await adminService.getStats();
+      setStats(data);
+    } catch (err: any) {
+      setError('Erreur lors du chargement des statistiques');
+      showSnackbar('Impossible de charger les statistiques', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  // =====================================
-  // Gestionnaires d'événements
-  // =====================================
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setCurrentTab(newValue);
-  };
-
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, userId: number) => {
-    setMenuAnchorEl(event.currentTarget);
-    setSelectedUserId(userId);
-  };
-
-  const handleMenuClose = () => {
-    setMenuAnchorEl(null);
-    setSelectedUserId(null);
-  };
-
-  const handleEditUser = (user: User) => {
-    setSelectedUser(user);
-    setUserFormData({
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      is_active: user.is_active ?? true,
-    });
-    setUserDialogOpen(true);
-    handleMenuClose();
-  };
-
-  const handleDeleteUser = async (userId: number) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
-      try {
-        await apiService.deleteUser(userId);
-        await loadAdminData();
-        setMessage({ type: 'success', text: 'Utilisateur supprimé avec succès' });
-      } catch (error) {
-        setMessage({ type: 'error', text: 'Erreur lors de la suppression' });
-      }
-    }
-    handleMenuClose();
-  };
-
-  const handleToggleUserStatus = async (userId: number, currentStatus: boolean) => {
+  // Actualisation complète de toutes les données
+  const refreshAllData = async () => {
     try {
-      await apiService.updateUser(userId, { is_active: !currentStatus });
-      await loadAdminData();
-      setMessage({ 
-        type: 'success', 
-        text: `Utilisateur ${!currentStatus ? 'activé' : 'désactivé'} avec succès` 
-      });
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Erreur lors de la modification du statut' });
+      setRefreshing(true);
+      await Promise.all([
+        loadStats(),
+        loadUsers(),
+        loadGraphs(),
+        loadSimulations(),
+        loadActivities()
+      ]);
+      showSnackbar('Données actualisées avec succès', 'success');
+    } catch (err: any) {
+      showSnackbar('Erreur lors de l\'actualisation', 'error');
+    } finally {
+      setRefreshing(false);
     }
-    handleMenuClose();
   };
 
-  const handleSaveUser = async () => {
+  const loadUsers = async () => {
     try {
-      if (selectedUser) {
-        await apiService.updateUser(selectedUser.id, userFormData);
-      } else {
-        await apiService.createUser({ ...userFormData, password: 'password123' });
-      }
-      
-      await loadAdminData();
-      setUserDialogOpen(false);
-      setSelectedUser(null);
-      setMessage({ 
-        type: 'success', 
-        text: selectedUser ? 'Utilisateur modifié avec succès' : 'Utilisateur créé avec succès' 
-      });
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Erreur lors de la sauvegarde' });
+      setLoading(true);
+      const data = await adminService.getUsers(userFilters);
+      setUsers(data);
+    } catch (err: any) {
+      showSnackbar('Erreur lors du chargement des utilisateurs', 'error');
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // =====================================
-  // Composants internes
-  // =====================================
-  const StatsCards: React.FC = () => {
-    if (!systemStats) return null;
+  const loadGraphs = async () => {
+    try {
+      setLoading(true);
+      const data = await adminService.getGraphs({ page: 1, search: '' });
+      setGraphs(data);
+    } catch (err: any) {
+      showSnackbar('Erreur lors du chargement des graphiques', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSimulations = async () => {
+    try {
+      setLoading(true);
+      const data = await adminService.getSimulations({ page: 1 });
+      setSimulations(data);
+    } catch (err: any) {
+      showSnackbar('Erreur lors du chargement des simulations', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadActivities = async () => {
+    try {
+      setLoading(true);
+      const data = await adminService.getActivityLog({ page: 1 });
+      setActivities(data);
+    } catch (err: any) {
+      showSnackbar('Erreur lors du chargement des activités', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSystemInfo = async () => {
+    try {
+      setLoading(true);
+      const data = await adminService.getSystemInfo();
+      setSystemInfo(data);
+    } catch (err: any) {
+      showSnackbar('Erreur lors du chargement des informations système', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fonctions utilitaires
+  const showSnackbar = (message: string, severity: 'success' | 'error' | 'info' | 'warning') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
+
+  // Actions utilisateurs
+  const handleDeleteUser = async (id: number) => {
+    try {
+      await adminService.deleteUser(id);
+      showSnackbar('Utilisateur désactivé avec succès', 'success');
+      loadUsers();
+    } catch (err: any) {
+      showSnackbar('Erreur lors de la suppression de l\'utilisateur', 'error');
+    }
+  };
+
+  // Rendu des cartes de statistiques
+  const renderStatsCards = () => {
+    if (!stats) return null;
+
+    const cards = [
+      {
+        title: 'Utilisateurs Total',
+        value: stats.overview.totalUsers,
+        icon: <PeopleIcon />,
+        color: '#1976d2',
+        subtitle: `+${stats.overview.recentUsers} cette semaine`
+      },
+      {
+        title: 'Graphiques',
+        value: stats.overview.totalGraphs,
+        icon: <StorageIcon />,
+        color: '#388e3c',
+        subtitle: `${stats.breakdown.graphsByStatus.public} publics`
+      },
+      {
+        title: 'Simulations Actives',
+        value: stats.overview.activeSimulations,
+        icon: <PlayIcon />,
+        color: '#f57c00',
+        subtitle: `${stats.overview.totalSimulations} au total`
+      },
+      {
+        title: 'Activité Aujourd\'hui',
+        value: stats.overview.todayActivity,
+        icon: <TimelineIcon />,
+        color: '#7b1fa2',
+        subtitle: 'Actions utilisateur'
+      }
+    ];
 
     return (
-      <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: 'wrap' }}>
-        <Box sx={{ flex: '1 1 250px', minWidth: '250px' }}>
-          <Card>
+      <Box sx={{ display: 'flex', gap: 3, mb: 4, flexWrap: 'wrap' }}>
+        {cards.map((card, index) => (
+          <Card key={index} sx={{ flex: { xs: '1 1 calc(50% - 12px)', md: '1 1 calc(25% - 18px)' }, minWidth: 200 }}>
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <People sx={{ fontSize: 40, color: 'primary.main', mr: 2 }} />
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Avatar sx={{ backgroundColor: card.color, mr: 2 }}>
+                  {card.icon}
+                </Avatar>
                 <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {systemStats.total_users}
+                  <Typography variant="h4" component="div" sx={{ fontWeight: 'bold' }}>
+                    {card.value.toLocaleString()}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Utilisateurs
+                  <Typography variant="h6" color="text.secondary">
+                    {card.title}
                   </Typography>
                 </Box>
               </Box>
+              <Typography variant="body2" color="text.secondary">
+                {card.subtitle}
+              </Typography>
             </CardContent>
           </Card>
+        ))}
+      </Box>
+    );
+  };
+
+  // Rendu de la table des utilisateurs
+  const renderUsersTable = () => {
+    if (!users) return null;
+
+    return (
+      <Box>
+        {/* Filtres */}
+        <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+          <TextField
+            placeholder="Rechercher..."
+            value={userFilters.search}
+            onChange={(e) => setUserFilters({ ...userFilters, search: e.target.value, page: 1 })}
+            size="small"
+            sx={{ minWidth: 200 }}
+          />
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Rôle</InputLabel>
+            <Select
+              value={userFilters.role}
+              onChange={(e) => setUserFilters({ ...userFilters, role: e.target.value, page: 1 })}
+              label="Rôle"
+            >
+              <MenuItem value="">Tous</MenuItem>
+              <MenuItem value="user">Utilisateur</MenuItem>
+              <MenuItem value="editor">Éditeur</MenuItem>
+              <MenuItem value="admin">Admin</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Statut</InputLabel>
+            <Select
+              value={userFilters.status || ''}
+              onChange={(e) => {
+                const value = e.target.value as string;
+                setUserFilters({ 
+                  ...userFilters, 
+                  status: value === '' ? undefined : value as 'active' | 'inactive',
+                  page: 1 
+                });
+              }}
+              label="Statut"
+            >
+              <MenuItem value="">Tous</MenuItem>
+              <MenuItem value="active">Actif</MenuItem>
+              <MenuItem value="inactive">Inactif</MenuItem>
+            </Select>
+          </FormControl>
+          <Button variant="contained" onClick={loadUsers}>
+            <RefreshIcon sx={{ mr: 1 }} /> Actualiser
+          </Button>
         </Box>
-        
-        <Box sx={{ flex: '1 1 250px', minWidth: '250px' }}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Timeline sx={{ fontSize: 40, color: 'success.main', mr: 2 }} />
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {systemStats.total_graphs}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Graphiques
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Box>
-        
-        <Box sx={{ flex: '1 1 250px', minWidth: '250px' }}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <PlayArrow sx={{ fontSize: 40, color: 'warning.main', mr: 2 }} />
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {systemStats.active_simulations}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Simulations
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Box>
-        
-        <Box sx={{ flex: '1 1 250px', minWidth: '250px' }}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <HealthAndSafety sx={{ fontSize: 40, color: 'info.main', mr: 2 }} />
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {systemStats.system_health}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Santé Système
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
+
+        {/* Table */}
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Utilisateur</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Rôle</TableCell>
+                <TableCell>Statut</TableCell>
+                <TableCell>Statistiques</TableCell>
+                <TableCell>Dernière activité</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {users.data.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Avatar sx={{ mr: 2 }}>
+                        <PersonIcon />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="body2" fontWeight="bold">
+                          {user.first_name} {user.last_name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          ID: {user.id}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={user.role}
+                      color={user.role === 'admin' ? 'error' : user.role === 'editor' ? 'warning' : 'default'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={user.is_active ? 'Actif' : 'Inactif'}
+                      color={user.is_active ? 'success' : 'error'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {user.stats.totalGraphs} graphiques
+                    </Typography>
+                    <Typography variant="body2">
+                      {user.stats.totalSimulations} simulations
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {user.stats.lastActivity ? new Date(user.stats.lastActivity).toLocaleDateString() : 'N/A'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title="Modifier">
+                      <IconButton size="small">
+                        <EditIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Désactiver">
+                      <IconButton onClick={() => handleDeleteUser(user.id)} size="small" color="error">
+                        <BlockIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        {/* Pagination */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination
+            count={users.pagination.pages}
+            page={users.pagination.page}
+            onChange={(_, page) => {
+              setUserFilters({ ...userFilters, page });
+            }}
+            color="primary"
+          />
         </Box>
       </Box>
     );
   };
 
-  const UsersTable: React.FC = () => (
-    <TableContainer component={Paper}>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell>Utilisateur</TableCell>
-            <TableCell>Email</TableCell>
-            <TableCell>Rôle</TableCell>
-            <TableCell>Statut</TableCell>
-            <TableCell>Inscription</TableCell>
-            <TableCell>Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {users.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Avatar sx={{ mr: 2, backgroundColor: 'primary.main' }}>
-                    {user.username.charAt(0).toUpperCase()}
-                  </Avatar>
-                  <Typography variant="body2">
-                    {user.username}
-                  </Typography>
-                </Box>
-              </TableCell>
-              <TableCell>{user.email}</TableCell>
-              <TableCell>
-                <Chip
-                  label={user.role}
-                  color={
-                    user.role === 'admin' ? 'error' : 
-                    user.role === 'editor' ? 'warning' : 'default'
-                  }
-                  size="small"
-                />
-              </TableCell>
-              <TableCell>
-                <Chip
-                  label={user.is_active ? 'Actif' : 'Inactif'}
-                  color={user.is_active ? 'success' : 'default'}
-                  size="small"
-                />
-              </TableCell>
-              <TableCell>
-                {new Date(user.created_at).toLocaleDateString()}
-              </TableCell>
-              <TableCell>
-                <IconButton
-                  onClick={(e) => handleMenuOpen(e, user.id)}
-                  size="small"
-                >
-                  <MoreVert />
-                </IconButton>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-
-  const SystemLogsList: React.FC = () => (
-    <List>
-      {systemLogs.map((log, index) => (
-        <React.Fragment key={index}>
-          <ListItem>
-            <ListItemIcon>
-              {log.level === 'error' ? (
-                <Error color="error" />
-              ) : log.level === 'warning' ? (
-                <Warning color="warning" />
-              ) : (
-                <CheckCircle color="success" />
-              )}
-            </ListItemIcon>
-            <ListItemText
-              primary={log.message}
-              secondary={`${new Date(log.timestamp).toLocaleString()} - ${log.source}`}
-            />
-          </ListItem>
-          {index < systemLogs.length - 1 && <Divider />}
-        </React.Fragment>
-      ))}
-    </List>
-  );
-
-  // =====================================
-  // Rendu conditionnel
-  // =====================================
-  if (loading && users.length === 0) {
-    return <LoadingPage message="Chargement du panneau d'administration..." />;
-  }
-
-  // =====================================
-  // Rendu
-  // =====================================
   return (
-    <Box>
+    <Box sx={{ width: '100%', minHeight: '100vh', bgcolor: 'background.default' }}>
       {/* En-tête */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-            Administration
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Gestion des utilisateurs et du système
-          </Typography>
+      <Box sx={{ 
+        borderBottom: 1, 
+        borderColor: 'divider', 
+        bgcolor: 'background.paper',
+        position: 'sticky',
+        top: 0,
+        zIndex: 1000
+      }}>
+        <Box sx={{ px: 3, py: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+              🎛️ Panneau d'Administration
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
+              Gestion centralisée de la plateforme VortexFlow
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Actualiser toutes les données">
+              <IconButton 
+                onClick={refreshAllData} 
+                disabled={refreshing}
+                color="primary"
+                sx={{ bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' } }}
+              >
+                <RefreshIcon sx={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
-        
-        <Button
-          variant="contained"
-          startIcon={<Refresh />}
-          onClick={loadAdminData}
-          disabled={loading}
-        >
-          Actualiser
-        </Button>
       </Box>
 
-      {/* Message de statut */}
-      {message && (
-        <Alert
-          severity={message.type}
-          onClose={() => setMessage(null)}
-          sx={{ mb: 3 }}
-        >
-          {message.text}
+      {/* Barre de progression */}
+      {loading && <LinearProgress sx={{ mb: 2 }} />}
+
+      {/* Message d'erreur */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+          {error}
         </Alert>
       )}
 
-      {/* Statistiques */}
-      <StatsCards />
+      {/* Cartes de statistiques (toujours visibles) */}
+      {renderStatsCards()}
 
       {/* Onglets */}
-      <Card>
-        <Tabs value={currentTab} onChange={handleTabChange}>
-          <Tab label="Utilisateurs" />
-          <Tab label="Système" />
-          <Tab label="Journaux" />
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Tabs value={activeTab} onChange={handleTabChange} aria-label="admin tabs">
+          <Tab icon={<DashboardIcon />} label="Vue d'ensemble" />
+          <Tab icon={<PeopleIcon />} label="Utilisateurs" />
+          <Tab icon={<StorageIcon />} label="Graphiques" />
+          <Tab icon={<PlayIcon />} label="Simulations" />
+          <Tab icon={<TimelineIcon />} label="Activité" />
+          <Tab icon={<SettingsIcon />} label="Système" />
         </Tabs>
+      </Box>
+
+      {/* Contenu des onglets */}
+      <TabPanel value={activeTab} index={0}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold' }}>
+            <DashboardIcon /> Tableau de Bord
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setActiveTab(1)}
+              startIcon={<PeopleIcon />}
+            >
+              Gérer Utilisateurs
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setActiveTab(3)}
+              startIcon={<PlayIcon />}
+            >
+              Voir Simulations
+            </Button>
+          </Box>
+        </Box>
+        {renderStatsCards()}
         
-        {loading && <LinearProgress />}
-        
-        <Box sx={{ p: 3 }}>
-          <TabPanel value={currentTab} index={0}>
-            <Box sx={{ mb: 2 }}>
+        {/* Section Raccourcis rapides */}
+        <Card sx={{ mt: 4 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              ⚡ Actions Rapides
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
               <Button
                 variant="contained"
-                onClick={() => {
-                  setSelectedUser(null);
-                  setUserFormData({
-                    username: '',
-                    email: '',
-                    role: 'viewer',
-                    is_active: true,
-                  });
-                  setUserDialogOpen(true);
-                }}
+                color="primary"
+                onClick={() => setActiveTab(1)}
+                startIcon={<PeopleIcon />}
               >
-                Ajouter un utilisateur
+                Gestion Utilisateurs
+              </Button>
+              <Button
+                variant="contained"
+                color="secondary"
+                onClick={() => setActiveTab(2)}
+                startIcon={<StorageIcon />}
+              >
+                Gestion Graphiques
+              </Button>
+              <Button
+                variant="contained"
+                color="warning"
+                onClick={() => setActiveTab(3)}
+                startIcon={<PlayIcon />}
+              >
+                Monitoring Simulations
+              </Button>
+              <Button
+                variant="contained"
+                color="info"
+                onClick={() => setActiveTab(5)}
+                startIcon={<SettingsIcon />}
+              >
+                Paramètres Système
               </Button>
             </Box>
-            <UsersTable />
-          </TabPanel>
-          
-          <TabPanel value={currentTab} index={1}>
-            <Typography variant="h6" gutterBottom>
-              Configuration du système
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Paramètres de configuration à implémenter
-            </Typography>
-          </TabPanel>
-          
-          <TabPanel value={currentTab} index={2}>
-            <Typography variant="h6" gutterBottom>
-              Journaux système
-            </Typography>
-            <SystemLogsList />
-          </TabPanel>
-        </Box>
-      </Card>
+          </CardContent>
+        </Card>
+      </TabPanel>
 
-      {/* Menu contextuel */}
-      <Menu
-        anchorEl={menuAnchorEl}
-        open={Boolean(menuAnchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={() => {
-          const user = users.find(u => u.id === selectedUserId);
-          if (user) handleEditUser(user);
-        }}>
-          <Edit sx={{ mr: 1 }} />
-          Modifier
-        </MenuItem>
-        
-        <MenuItem onClick={() => {
-          const user = users.find(u => u.id === selectedUserId);
-          if (user && selectedUserId) {
-            handleToggleUserStatus(selectedUserId, user.is_active ?? true);
-          }
-        }}>
-          <Block sx={{ mr: 1 }} />
-          {users.find(u => u.id === selectedUserId)?.is_active ? 'Désactiver' : 'Activer'}
-        </MenuItem>
-        
-        <MenuItem
-          onClick={() => selectedUserId && handleDeleteUser(selectedUserId)}
-          sx={{ color: 'error.main' }}
-        >
-          <Delete sx={{ mr: 1 }} />
-          Supprimer
-        </MenuItem>
-      </Menu>
+      <TabPanel value={activeTab} index={1}>
+        {renderUsersTable()}
+      </TabPanel>
 
-      {/* Dialog d'édition d'utilisateur */}
-      <Dialog open={userDialogOpen} onClose={() => setUserDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {selectedUser ? 'Modifier l\'utilisateur' : 'Ajouter un utilisateur'}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Nom d'utilisateur"
-            value={userFormData.username}
-            onChange={(e) => setUserFormData(prev => ({ ...prev, username: e.target.value }))}
-            margin="normal"
-          />
-          
-          <TextField
-            fullWidth
-            label="Email"
-            type="email"
-            value={userFormData.email}
-            onChange={(e) => setUserFormData(prev => ({ ...prev, email: e.target.value }))}
-            margin="normal"
-          />
-          
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Rôle</InputLabel>
-            <Select
-              value={userFormData.role}
-              label="Rôle"
-              onChange={(e) => setUserFormData(prev => ({ ...prev, role: e.target.value as any }))}
+      <TabPanel value={activeTab} index={2}>
+        <Box sx={{ display: 'flex', justify: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold' }}>
+            <StorageIcon /> Gestion des Graphiques
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Chip 
+              label={`${stats?.overview.totalGraphs || 0} graphiques`} 
+              color="secondary" 
+              variant="outlined"
+            />
+            <Button
+              variant="contained"
+              size="small"
+              onClick={loadGraphs}
+              startIcon={<RefreshIcon />}
+              disabled={loading}
             >
-              <MenuItem value="viewer">Viewer</MenuItem>
-              <MenuItem value="editor">Editor</MenuItem>
-              <MenuItem value="admin">Admin</MenuItem>
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setUserDialogOpen(false)}>Annuler</Button>
-          <Button onClick={handleSaveUser} variant="contained">
-            {selectedUser ? 'Modifier' : 'Créer'}
+              Actualiser
+            </Button>
+          </Box>
+        </Box>
+        
+        {/* Statistiques graphiques */}
+        {stats && (
+          <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+            <Card sx={{ flex: 1 }}>
+              <CardContent>
+                <Typography variant="h6" color="success.main">
+                  {stats.breakdown.graphsByStatus.public}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Graphiques Publics
+                </Typography>
+              </CardContent>
+            </Card>
+            <Card sx={{ flex: 1 }}>
+              <CardContent>
+                <Typography variant="h6" color="warning.main">
+                  {stats.breakdown.graphsByStatus.private}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Graphiques Privés
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
+        
+        <Alert severity="info" sx={{ mb: 2 }}>
+          💡 Section en développement - Gestion complète des graphiques DOT à venir
+        </Alert>
+        
+        {graphs && (
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>Aperçu des Graphiques</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {graphs.pagination.total} graphiques trouvés
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
+      </TabPanel>
+
+      <TabPanel value={activeTab} index={3}>
+        <Typography variant="h6" gutterBottom>
+          Gestion des Simulations
+        </Typography>
+        <Typography variant="body1">
+          {simulations ? `${simulations.pagination.total} simulations au total` : 'Section en cours de développement...'}
+        </Typography>
+      </TabPanel>
+
+      <TabPanel value={activeTab} index={4}>
+        <Typography variant="h6" gutterBottom>
+          Journal d'Activité
+        </Typography>
+        <Typography variant="body1">
+          {activities ? `${activities.pagination.total} entrées d'activité` : 'Section en cours de développement...'}
+        </Typography>
+      </TabPanel>
+
+      <TabPanel value={activeTab} index={5}>
+        <Box sx={{ display: 'flex', justify: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold' }}>
+            <SettingsIcon /> Paramètres Système
+          </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={loadSystemInfo}
+            startIcon={<RefreshIcon />}
+            disabled={loading}
+          >
+            Actualiser Infos
           </Button>
-        </DialogActions>
-      </Dialog>
+        </Box>
+        
+        {systemInfo && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* Informations serveur */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  🖥️ Informations Serveur
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap', mt: 2 }}>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">Version</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 'bold' }}>{systemInfo.version}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">Node.js</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 'bold' }}>{systemInfo.nodeVersion}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">Environnement</Typography>
+                    <Chip label={systemInfo.environment} size="small" color="primary" />
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">Plateforme</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                      {systemInfo.platform} ({systemInfo.architecture})
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+            
+            {/* Mémoire */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  💾 Utilisation Mémoire
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap', mt: 2 }}>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">Heap Utilisé</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
+                      {adminService.formatMemorySize(systemInfo.memory.heapUsed)}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">Heap Total</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                      {adminService.formatMemorySize(systemInfo.memory.heapTotal)}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">RSS</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                      {adminService.formatMemorySize(systemInfo.memory.rss)}
+                    </Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+            
+            {/* Base de données */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  🗄️ Bases de Données
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap', mt: 2 }}>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">PostgreSQL</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                      {systemInfo.database.host}:{systemInfo.database.port}
+                    </Typography>
+                    <Chip label={systemInfo.database.name} size="small" color="success" />
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">Redis</Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                      {systemInfo.redis.host}:{systemInfo.redis.port}
+                    </Typography>
+                    <Chip label="Connecté" size="small" color="success" />
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+            
+            {/* Actions système */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  🔧 Actions Système
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mt: 2 }}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => showSnackbar('Sauvegarde en cours...', 'info')}
+                    startIcon={<StorageIcon />}
+                  >
+                    Créer Sauvegarde
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="warning"
+                    onClick={refreshAllData}
+                    startIcon={<RefreshIcon />}
+                  >
+                    Actualiser Cache
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
+        
+        {!systemInfo && (
+          <Alert severity="info">
+            💡 Chargement des informations système...
+          </Alert>
+        )}
+      </TabPanel>
+
+      {/* Snackbar pour les notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -4,7 +4,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box,
-  Grid,
   Card,
   CardContent,
   Typography,
@@ -25,7 +24,6 @@ import {
   Add,
   AccountTree,
   TrendingUp,
-  Group,
   People,
   Timeline,
   PlayArrow,
@@ -36,7 +34,9 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useGraph } from '../../context/GraphContext';
+import { useSimulation } from '../../context/SimulationContext';
 import { usePermissions } from '../../context/AuthContext';
+import { apiService } from '../../services/api';
 import LoadingPage from '../common/LoadingPage';
 
 interface DashboardStats {
@@ -50,6 +50,7 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { state: authState } = useAuth();
   const { state: graphState, loadGraphs } = useGraph();
+  const { state: simulationState, actions: simulationActions } = useSimulation();
   const { canEdit, user } = usePermissions();
 
   // États locaux
@@ -67,17 +68,35 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const initializeDashboard = async () => {
       try {
-        await loadGraphs({ limit: 5 }); // Charger les 5 derniers graphiques
+        // Charger les graphiques, sessions et statistiques en parallèle
+        const [graphsResult, sessionsResult, statsResult] = await Promise.allSettled([
+          loadGraphs({ limit: 5 }),
+          simulationActions.loadSessions(),
+          apiService.getDashboardStats()
+        ]);
         
-        // Simuler des statistiques (à remplacer par de vraies données API)
-        setStats({
-          totalGraphs: graphState.graphs.length,
-          activeSimulations: 2,
-          totalUsers: 12,
-          recentActivity: 5,
-        });
+        // Utiliser les vraies statistiques si disponibles, sinon fallback
+        if (statsResult.status === 'fulfilled' && statsResult.value.success) {
+          setStats(statsResult.value.data);
+        } else {
+          // Fallback avec données calculees et sessions
+          const activeSimCount = simulationState.sessions.filter(s => s.status === 'running').length;
+          setStats({
+            totalGraphs: graphState.graphs.length,
+            activeSimulations: activeSimCount,
+            totalUsers: 1, // Au moins l'utilisateur actuel
+            recentActivity: graphState.graphs.length,
+          });
+        }
       } catch (error) {
         console.error('Erreur lors du chargement du dashboard:', error);
+        // Fallback en cas d'erreur
+        setStats({
+          totalGraphs: graphState.graphs.length,
+          activeSimulations: 0,
+          totalUsers: 1,
+          recentActivity: 0,
+        });
       } finally {
         setLoading(false);
       }
