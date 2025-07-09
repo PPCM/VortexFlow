@@ -190,8 +190,8 @@ const requireGraphAccess = (accessType = 'view') => {
  * Rate limiting for authentication endpoints
  */
 const authRateLimit = require('express-rate-limit')({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window
+  windowMs: process.env.NODE_ENV === 'production' ? 15 * 60 * 1000 : 5 * 60 * 1000, // 15 min prod, 5 min dev
+  max: process.env.NODE_ENV === 'production' ? 5 : 20, // 5 attempts prod, 20 dev
   message: {
     error: 'Too many authentication attempts, please try again later',
     code: 'AUTH_RATE_LIMIT_EXCEEDED'
