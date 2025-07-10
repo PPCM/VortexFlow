@@ -29,7 +29,7 @@ export interface UserWithStats {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'user' | 'editor' | 'admin';
+  role: 'viewer' | 'editor' | 'admin';
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -160,6 +160,9 @@ export const adminService = {
     status?: 'active' | 'inactive';
   } = {}): Promise<PaginatedResponse<UserWithStats>> {
     const response = await apiService.client.get('/admin/users', { params });
+    console.log('🔍 Structure réponse API:', response.data);
+    console.log('🔍 response.data.data:', response.data.data);
+    console.log('🔍 response.data.data.users:', response.data.data?.users);
     return {
       data: response.data.data.users,
       pagination: response.data.data.pagination
@@ -181,10 +184,51 @@ export const adminService = {
   },
 
   /**
+   * Créer un nouvel utilisateur
+   */
+  async createUser(userData: {
+    email: string;
+    password: string;
+    first_name: string;
+    last_name: string;
+    role?: 'viewer' | 'editor' | 'admin';
+  }): Promise<UserWithStats> {
+    const response = await apiService.client.post('/admin/users', userData);
+    return response.data.data;
+  },
+
+  /**
    * Désactiver un utilisateur
    */
   async deleteUser(id: number): Promise<void> {
     await apiService.client.delete(`/admin/users/${id}`);
+  },
+
+  /**
+   * Supprimer définitivement un utilisateur
+   */
+  async permanentDeleteUser(id: number): Promise<void> {
+    await apiService.client.delete(`/admin/users/${id}/permanent`);
+  },
+
+  /**
+   * Réinitialiser le mot de passe d'un utilisateur
+   */
+  async resetUserPassword(id: number, newPassword: string): Promise<void> {
+    await apiService.client.post(`/admin/users/${id}/reset-password`, {
+      new_password: newPassword
+    });
+  },
+
+  /**
+   * Actions en masse sur les utilisateurs
+   */
+  async bulkUserAction(action: 'activate' | 'deactivate' | 'delete' | 'permanent_delete', userIds: number[]): Promise<{ affected_count: number }> {
+    const response = await apiService.client.post('/admin/users/bulk-action', {
+      action,
+      user_ids: userIds
+    });
+    return response.data.data;
   },
 
   /**
@@ -267,7 +311,7 @@ export const adminService = {
    */
   getRoles(): Array<{ value: string; label: string }> {
     return [
-      { value: 'user', label: 'Utilisateur' },
+      { value: 'viewer', label: 'Utilisateur' },
       { value: 'editor', label: 'Éditeur' },
       { value: 'admin', label: 'Administrateur' }
     ];

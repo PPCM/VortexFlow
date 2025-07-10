@@ -31,7 +31,9 @@ import {
   MenuItem,
   Snackbar,
   IconButton,
-  Tooltip
+  Tooltip,
+  Checkbox,
+  InputAdornment
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -43,7 +45,12 @@ import {
   Refresh as RefreshIcon,
   Edit as EditIcon,
   Block as BlockIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  Add as AddIcon,
+  Search as SearchIcon,
+  VpnKey as VpnKeyIcon,
+  Check as CheckIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 
 import { 
@@ -59,6 +66,11 @@ import {
 
 // Import CSS personnalisé
 import './AdminPanel.css';
+
+// Import des composants de gestion des utilisateurs
+import UserManagementDialog, { UserFormData } from './UserManagementDialog';
+import BulkActionsBar from './BulkActionsBar';
+import PasswordResetDialog from './PasswordResetDialog';
 
 // Interface pour les panneaux d'onglets
 interface TabPanelProps {
@@ -112,18 +124,33 @@ const AdminPanel: React.FC = () => {
     status: undefined as 'active' | 'inactive' | undefined
   });
 
+  // États pour la gestion des utilisateurs
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [userDialog, setUserDialog] = useState({ open: false, user: null as UserWithStats | null });
+  const [passwordDialog, setPasswordDialog] = useState({ open: false, user: null as UserWithStats | null });
+  const [userDialogLoading, setUserDialogLoading] = useState(false);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+
   // Chargement initial
   useEffect(() => {
     loadStats();
   }, []);
 
+  // Chargement des données quand on change d'onglet
   useEffect(() => {
     if (activeTab === 1) loadUsers();
     else if (activeTab === 2) loadGraphs();
     else if (activeTab === 3) loadSimulations();
     else if (activeTab === 4) loadActivities();
     else if (activeTab === 5) loadSystemInfo();
-  }, [activeTab, userFilters]);
+  }, [activeTab]);
+
+  // Rechargement des utilisateurs quand les filtres changent
+  useEffect(() => {
+    if (activeTab === 1) {
+      loadUsers();
+    }
+  }, [userFilters]);
 
   // Fonctions de chargement des données
   const loadStats = async () => {
@@ -165,8 +192,12 @@ const AdminPanel: React.FC = () => {
       const data = await adminService.getUsers(userFilters);
       setUsers(data);
     } catch (err: any) {
-      showSnackbar('Erreur lors du chargement des utilisateurs', 'error');
-      console.error(err);
+      console.error('Erreur lors du chargement des utilisateurs:', err);
+      if (err.response?.status === 401) {
+        showSnackbar('Authentification requise. Veuillez vous reconnecter.', 'error');
+      } else {
+        showSnackbar(`Erreur lors du chargement des utilisateurs: ${err.message || 'Erreur inconnue'}`, 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -240,6 +271,142 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const handlePermanentDeleteUser = async (id: number) => {
+    try {
+      await adminService.permanentDeleteUser(id);
+      showSnackbar('Utilisateur supprimé définitivement', 'success');
+      loadUsers();
+    } catch (err: any) {
+      showSnackbar('Erreur lors de la suppression définitive de l\'utilisateur', 'error');
+    }
+  };
+
+  // Gestion complète des utilisateurs
+  const handleCreateUser = () => {
+    setUserDialog({ open: true, user: null });
+  };
+
+  const handleEditUser = (user: UserWithStats) => {
+    setUserDialog({ open: true, user });
+  };
+
+  const handleUserSubmit = async (userData: UserFormData) => {
+    setUserDialogLoading(true);
+    try {
+      if (userDialog.user) {
+        // Mode édition
+        await adminService.updateUser(userDialog.user.id, userData);
+        showSnackbar('Utilisateur modifié avec succès', 'success');
+      } else {
+        // Mode création - password obligatoire
+        if (!userData.password) {
+          throw new Error('Le mot de passe est requis pour créer un utilisateur');
+        }
+        await adminService.createUser({
+          ...userData,
+          password: userData.password
+        });
+        showSnackbar('Utilisateur créé avec succès', 'success');
+      }
+      loadUsers();
+    } catch (err: any) {
+      showSnackbar(
+        `Erreur lors de ${userDialog.user ? 'la modification' : 'la création'} de l'utilisateur`, 
+        'error'
+      );
+      throw err; // Pour empêcher la fermeture du dialog
+    } finally {
+      setUserDialogLoading(false);
+    }
+  };
+
+  const handlePasswordReset = (user: UserWithStats) => {
+    setPasswordDialog({ open: true, user });
+  };
+
+  const handlePasswordSubmit = async (newPassword: string) => {
+    if (!passwordDialog.user) return;
+    
+    try {
+      await adminService.resetUserPassword(passwordDialog.user.id, newPassword);
+      showSnackbar('Mot de passe réinitialisé avec succès', 'success');
+    } catch (err: any) {
+      showSnackbar('Erreur lors de la réinitialisation du mot de passe', 'error');
+      throw err;
+    }
+  };
+
+  // Gestion de la sélection multiple
+  const handleUserSelect = (userId: number, checked: boolean) => {
+    if (checked) {
+      setSelectedUsers(prev => [...prev, userId]);
+    } else {
+      setSelectedUsers(prev => prev.filter(id => id !== userId));
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked && users?.data) {
+      setSelectedUsers(users.data.map(user => user.id));
+    } else {
+      setSelectedUsers([]);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedUsers([]);
+  };
+
+  // Actions en masse
+  const handleBulkActivate = async () => {
+    setBulkActionLoading(true);
+    try {
+      await adminService.bulkUserAction('activate', selectedUsers);
+      showSnackbar(`${selectedUsers.length} utilisateur(s) activé(s)`, 'success');
+      clearSelection();
+      loadUsers();
+    } catch (err: any) {
+      showSnackbar('Erreur lors de l\'activation en masse', 'error');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkDeactivate = async () => {
+    setBulkActionLoading(true);
+    try {
+      await adminService.bulkUserAction('deactivate', selectedUsers);
+      showSnackbar(`${selectedUsers.length} utilisateur(s) désactivé(s)`, 'success');
+      clearSelection();
+      loadUsers();
+    } catch (err: any) {
+      showSnackbar('Erreur lors de la désactivation en masse', 'error');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    // Confirmation avant suppression définitive
+    const confirmMessage = `Êtes-vous sûr de vouloir supprimer définitivement ${selectedUsers.length} utilisateur(s) ? Cette action est irréversible.`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+    
+    setBulkActionLoading(true);
+    try {
+      await adminService.bulkUserAction('permanent_delete', selectedUsers);
+      showSnackbar(`${selectedUsers.length} utilisateur(s) supprimé(s) définitivement`, 'success');
+      clearSelection();
+      loadUsers();
+    } catch (err: any) {
+      showSnackbar('Erreur lors de la suppression définitive en masse', 'error');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
   // Rendu des cartes de statistiques
   const renderStatsCards = () => {
     if (!stats) return null;
@@ -305,18 +472,94 @@ const AdminPanel: React.FC = () => {
 
   // Rendu de la table des utilisateurs
   const renderUsersTable = () => {
-    if (!users) return null;
+    // Affichage pendant le chargement initial
+    if (!users && loading) {
+      return (
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <LinearProgress sx={{ mb: 2 }} />
+          <Typography variant="h6" color="text.secondary">
+            Chargement des utilisateurs...
+          </Typography>
+        </Box>
+      );
+    }
+
+    // Affichage si aucun utilisateur (première fois ou erreur)
+    if (!users) {
+      return (
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            Aucun utilisateur chargé
+          </Typography>
+          <Button 
+            variant="contained" 
+            onClick={loadUsers}
+            startIcon={<RefreshIcon />}
+          >
+            Charger les utilisateurs
+          </Button>
+        </Box>
+      );
+    }
+
+    // Affichage si la liste est vide
+    if (users.data.length === 0) {
+      return (
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            Aucun utilisateur trouvé
+          </Typography>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            {userFilters.search || userFilters.role || userFilters.status 
+              ? 'Essayez de modifier vos filtres de recherche'
+              : 'Commencez par créer votre premier utilisateur'
+            }
+          </Typography>
+          <Box sx={{ mt: 2, display: 'flex', gap: 1, justifyContent: 'center' }}>
+            <Button 
+              variant="contained" 
+              onClick={handleCreateUser}
+              startIcon={<AddIcon />}
+            >
+              Créer un utilisateur
+            </Button>
+            {(userFilters.search || userFilters.role || userFilters.status) && (
+              <Button 
+                variant="outlined" 
+                onClick={() => {
+                  setUserFilters({ page: 1, search: '', role: '', status: undefined });
+                }}
+              >
+                Effacer les filtres
+              </Button>
+            )}
+          </Box>
+        </Box>
+      );
+    }
+
+    const isAllSelected = users.data.length > 0 && selectedUsers.length === users.data.length;
+    const isSomeSelected = selectedUsers.length > 0 && selectedUsers.length < users.data.length;
 
     return (
       <Box>
+
+
         {/* Filtres */}
         <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
           <TextField
-            placeholder="Rechercher..."
+            placeholder="Rechercher par nom ou email..."
             value={userFilters.search}
             onChange={(e) => setUserFilters({ ...userFilters, search: e.target.value, page: 1 })}
             size="small"
-            sx={{ minWidth: 200 }}
+            sx={{ minWidth: 250 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon color="action" />
+                </InputAdornment>
+              )
+            }}
           />
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Rôle</InputLabel>
@@ -350,91 +593,188 @@ const AdminPanel: React.FC = () => {
               <MenuItem value="inactive">Inactif</MenuItem>
             </Select>
           </FormControl>
-          <Button variant="contained" onClick={loadUsers}>
-            <RefreshIcon sx={{ mr: 1 }} /> Actualiser
+          <Button 
+            variant="outlined" 
+            onClick={loadUsers}
+            disabled={loading}
+            startIcon={<RefreshIcon />}
+          >
+            Actualiser
           </Button>
         </Box>
 
+        {/* Barre d'actions en masse */}
+        <BulkActionsBar
+          selectedCount={selectedUsers.length}
+          onActivate={handleBulkActivate}
+          onDeactivate={handleBulkDeactivate}
+          onDelete={handleBulkDelete}
+          onClear={clearSelection}
+          loading={bulkActionLoading}
+        />
+
         {/* Table */}
-        <TableContainer component={Paper}>
+        <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 2 }}>
           <Table>
             <TableHead>
-              <TableRow>
-                <TableCell>Utilisateur</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Rôle</TableCell>
-                <TableCell>Statut</TableCell>
-                <TableCell>Statistiques</TableCell>
-                <TableCell>Dernière activité</TableCell>
-                <TableCell>Actions</TableCell>
+              <TableRow sx={{ backgroundColor: 'primary.light' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Checkbox
+                      checked={isAllSelected}
+                      indeterminate={isSomeSelected}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSelectAll(e.target.checked)}
+                      size="small"
+                    />
+                    Utilisateur
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Rôle</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Statut</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Statistiques</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Dernière activité</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {users.data.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Avatar sx={{ mr: 2 }}>
-                        <PersonIcon />
-                      </Avatar>
+              {users.data.map((user) => {
+                const isSelected = selectedUsers.includes(user.id);
+                return (
+                  <TableRow 
+                    key={user.id}
+                    selected={isSelected}
+                    hover
+                    sx={{
+                      '&:hover': {
+                        backgroundColor: 'action.hover'
+                      },
+                      ...(isSelected && {
+                        backgroundColor: 'primary.light',
+                        '&:hover': {
+                          backgroundColor: 'primary.main'
+                        }
+                      })
+                    }}
+                  >
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUserSelect(user.id, e.target.checked)}
+                          size="small"
+                          sx={{ mr: 1 }}
+                        />
+                        <Avatar sx={{ mr: 2, bgcolor: user.role === 'admin' ? 'error.main' : user.role === 'editor' ? 'warning.main' : 'primary.main' }}>
+                          <PersonIcon />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2" fontWeight="bold">
+                            {user.first_name} {user.last_name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            ID: {user.id}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{user.email}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={user.role.toUpperCase()}
+                        color={user.role === 'admin' ? 'error' : user.role === 'editor' ? 'warning' : 'primary'}
+                        size="small"
+                        sx={{ fontWeight: 'bold' }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={user.is_active ? 'Actif' : 'Inactif'}
+                        color={user.is_active ? 'success' : 'error'}
+                        size="small"
+                        variant={user.is_active ? 'filled' : 'outlined'}
+                      />
+                    </TableCell>
+                    <TableCell>
                       <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {user.first_name} {user.last_name}
+                        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          📊 {user.stats.totalGraphs} graphiques
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          ID: {user.id}
+                        <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          🧪 {user.stats.totalSimulations} simulations
                         </Typography>
                       </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={user.role}
-                      color={user.role === 'admin' ? 'error' : user.role === 'editor' ? 'warning' : 'default'}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={user.is_active ? 'Actif' : 'Inactif'}
-                      color={user.is_active ? 'success' : 'error'}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {user.stats.totalGraphs} graphiques
-                    </Typography>
-                    <Typography variant="body2">
-                      {user.stats.totalSimulations} simulations
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {user.stats.lastActivity ? new Date(user.stats.lastActivity).toLocaleDateString() : 'N/A'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title="Modifier">
-                      <IconButton size="small">
-                        <EditIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Désactiver">
-                      <IconButton onClick={() => handleDeleteUser(user.id)} size="small" color="error">
-                        <BlockIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {user.stats.lastActivity 
+                          ? new Date(user.stats.lastActivity).toLocaleDateString('fr-FR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric'
+                            })
+                          : 'Jamais'
+                        }
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Tooltip title="Modifier l'utilisateur">
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handleEditUser(user)}
+                            sx={{ color: 'primary.main' }}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Réinitialiser le mot de passe">
+                          <IconButton 
+                            size="small" 
+                            onClick={() => handlePasswordReset(user)}
+                            sx={{ color: 'warning.main' }}
+                          >
+                            <VpnKeyIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title={user.is_active ? 'Désactiver' : 'Activer'}>
+                          <IconButton 
+                            onClick={() => handleDeleteUser(user.id)} 
+                            size="small" 
+                            sx={{ color: user.is_active ? 'error.main' : 'success.main' }}
+                          >
+                            {user.is_active ? <BlockIcon /> : <CheckIcon />}
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Supprimer définitivement">
+                          <IconButton 
+                            onClick={() => {
+                              if (window.confirm('Êtes-vous sûr de vouloir supprimer définitivement cet utilisateur ? Cette action est irréversible.')) {
+                                handlePermanentDeleteUser(user.id);
+                              }
+                            }}
+                            size="small" 
+                            sx={{ color: 'error.dark' }}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
 
         {/* Pagination */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
+          <Typography variant="body2" color="text.secondary">
+            Affichage de {((users.pagination.page - 1) * users.pagination.limit) + 1} à {Math.min(users.pagination.page * users.pagination.limit, users.pagination.total)} sur {users.pagination.total} utilisateurs
+          </Typography>
           <Pagination
             count={users.pagination.pages}
             page={users.pagination.page}
@@ -442,6 +782,9 @@ const AdminPanel: React.FC = () => {
               setUserFilters({ ...userFilters, page });
             }}
             color="primary"
+            size="large"
+            showFirstButton
+            showLastButton
           />
         </Box>
       </Box>
@@ -580,6 +923,28 @@ const AdminPanel: React.FC = () => {
       </TabPanel>
 
       <TabPanel value={activeTab} index={1}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold' }}>
+            <PeopleIcon /> Gestion des Utilisateurs
+            {users && (
+              <Chip 
+                label={`${users.pagination.total || 0} total`} 
+                color="primary" 
+                variant="outlined" 
+                size="small"
+                sx={{ ml: 1 }}
+              />
+            )}
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={handleCreateUser}
+            startIcon={<AddIcon />}
+            disabled={userDialogLoading}
+          >
+            Nouvel Utilisateur
+          </Button>
+        </Box>
         {renderUsersTable()}
       </TabPanel>
 
@@ -817,6 +1182,24 @@ const AdminPanel: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Dialogues de gestion des utilisateurs */}
+      <UserManagementDialog
+        open={userDialog.open}
+        user={userDialog.user}
+        onClose={() => setUserDialog({ open: false, user: null })}
+        onSubmit={handleUserSubmit}
+        onDelete={handlePermanentDeleteUser}
+        loading={userDialogLoading}
+      />
+
+      <PasswordResetDialog
+        open={passwordDialog.open}
+        user={passwordDialog.user}
+        onClose={() => setPasswordDialog({ open: false, user: null })}
+        onSubmit={handlePasswordSubmit}
+        loading={userDialogLoading}
+      />
     </Box>
   );
 };
