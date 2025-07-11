@@ -38,11 +38,12 @@ import {
   Warning,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Editor } from '@monaco-editor/react';
+import DOTCodeMirrorEditor from './DOTCodeMirrorEditor';
 import { useGraph } from '../../context/GraphContext';
 import { useWebSocket } from '../../services/websocket';
 import { Graph, DOTValidationResult, SimulationConfig } from '../../types';
 import LoadingPage from '../common/LoadingPage';
+import GraphRenderer3D from './GraphRenderer3D';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -57,9 +58,10 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index, ...other })
       hidden={value !== index}
       id={`editor-tabpanel-${index}`}
       aria-labelledby={`editor-tab-${index}`}
+      style={{ height: '100%', display: value === index ? 'block' : 'none' }}
       {...other}
     >
-      {value === index && <Box sx={{ height: '100%' }}>{children}</Box>}
+      {value === index && <Box sx={{ height: '100%', width: '100%' }}>{children}</Box>}
     </div>
   );
 };
@@ -82,7 +84,21 @@ const GraphEditor: React.FC = () => {
 
   // États locaux
   const [currentTab, setCurrentTab] = useState(0);
-  const [dotContent, setDotContent] = useState('');
+  const [dotContent, setDotContent] = useState(`// digraph = graphe dirigé (avec flèches)
+// graph = graphe non-dirigé (sans flèches)
+digraph example {
+  // Définition des nœuds
+  A [label="Server", color="lightblue", shape="box"];
+  B [label="Router", color="orange", shape="ellipse"];
+  C [label="Client1", color="lightgreen"];
+  D [label="Client2", color="lightgreen"];
+  
+  // Définition des arêtes
+  A -> B [label="data"];
+  B -> C [label="req1"];
+  B -> D [label="req2"];
+  C -> D [style="dashed", color="gray"];
+}`);
   const [graphName, setGraphName] = useState('');
   const [graphDescription, setGraphDescription] = useState('');
   const [isPublic, setIsPublic] = useState(false);
@@ -103,14 +119,18 @@ const GraphEditor: React.FC = () => {
       loadGraph(Number(id));
     } else {
       // Initialiser un nouveau graphique
-      setDotContent(`digraph NewGraph {
-  rankdir=LR;
-  node [shape=circle, style=filled, fillcolor=lightblue];
-  edge [color=gray];
+      setDotContent(`digraph exemple {
+  // Définition des nœuds
+  A [label="Serveur", color="lightblue", shape="box"];
+  B [label="Router", color="orange", shape="ellipse"];
+  C [label="Client1", color="lightgreen"];
+  D [label="Client2", color="lightgreen"];
   
-  A -> B;
-  B -> C;
-  A -> C;
+  // Définition des arêtes
+  A -> B [label="données"];
+  B -> C [label="req1"];
+  B -> D [label="req2"];
+  C -> D [style="dashed", color="gray"];
 }`);
       setGraphName('Nouveau Graphique');
       setGraphDescription('');
@@ -264,7 +284,7 @@ const GraphEditor: React.FC = () => {
           <Alert severity="error" sx={{ mt: 1 }}>
             <Typography variant="subtitle2">Erreurs:</Typography>
             <ul style={{ margin: 0, paddingLeft: 20 }}>
-              {errors.map((error, index) => (
+              {errors.map((error: string, index: number) => (
                 <li key={index}>{error}</li>
               ))}
             </ul>
@@ -275,7 +295,7 @@ const GraphEditor: React.FC = () => {
           <Alert severity="warning" sx={{ mt: 1 }}>
             <Typography variant="subtitle2">Avertissements:</Typography>
             <ul style={{ margin: 0, paddingLeft: 20 }}>
-              {warnings.map((warning, index) => (
+              {warnings.map((warning: string, index: number) => (
                 <li key={index}>{warning}</li>
               ))}
             </ul>
@@ -415,38 +435,22 @@ const GraphEditor: React.FC = () => {
             
             <Box sx={{ flexGrow: 1, p: 0 }}>
               <TabPanel value={currentTab} index={0}>
-                <Editor
-                  height="100%"
-                  defaultLanguage="dot"
-                  value={dotContent}
-                  onChange={handleDotContentChange}
-                  theme="vs-dark"
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    lineNumbers: 'on',
-                    roundedSelection: false,
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                    wordWrap: 'on',
-                  }}
-                />
+                <Box sx={{ height: '450px', width: '100%' }}>
+                  <DOTCodeMirrorEditor
+                    value={dotContent}
+                    onChange={handleDotContentChange}
+                    height="450px"
+                  />
+                </Box>
               </TabPanel>
               
               <TabPanel value={currentTab} index={1}>
-                <Box
-                  sx={{
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'linear-gradient(45deg, rgba(0,255,136,0.1), rgba(255,107,53,0.1))',
-                  }}
-                >
-                  <Typography variant="h6" color="text.secondary">
-                    Aperçu 3D - À implémenter avec Three.js
-                  </Typography>
-                </Box>
+                <GraphRenderer3D
+                  dotContent={dotContent}
+                  isValid={validationResult?.isValid ?? false}
+                  parsedData={validationResult?.parsedGraph}
+                  height={450}
+                />
               </TabPanel>
             </Box>
           </Paper>

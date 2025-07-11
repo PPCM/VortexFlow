@@ -171,12 +171,13 @@ class ApiService {
   // Méthodes Validation DOT
   // =====================================
   async validateDot(dotContent: string): Promise<ApiResponse<any>> {
-    const response = await this.client.post('/graphs/validate', { dot_content: dotContent });
+    const response = await this.client.post('/graphs/validate-dot', { dotCode: dotContent });
     return response.data;
   }
 
   async parseDot(dotContent: string): Promise<ApiResponse<any>> {
-    const response = await this.client.post('/graphs/parse', { dot_content: dotContent });
+    // Utiliser l'endpoint de validation qui inclut le parsing
+    const response = await this.client.post('/graphs/validate-dot', { dotCode: dotContent });
     return response.data;
   }
 
