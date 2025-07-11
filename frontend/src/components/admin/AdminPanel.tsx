@@ -119,6 +119,7 @@ const AdminPanel: React.FC = () => {
   // États des filtres et pagination
   const [userFilters, setUserFilters] = useState({ 
     page: 1, 
+    limit: 20,
     search: '', 
     role: '', 
     status: undefined as 'active' | 'inactive' | undefined
@@ -189,7 +190,11 @@ const AdminPanel: React.FC = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const data = await adminService.getUsers(userFilters);
+      const params = {
+        ...userFilters,
+        limit: userFilters.limit === -1 ? undefined : userFilters.limit // -1 = tout afficher
+      };
+      const data = await adminService.getUsers(params);
       setUsers(data);
     } catch (err: any) {
       console.error('Erreur lors du chargement des utilisateurs:', err);
@@ -527,7 +532,7 @@ const AdminPanel: React.FC = () => {
               <Button 
                 variant="outlined" 
                 onClick={() => {
-                  setUserFilters({ page: 1, search: '', role: '', status: undefined });
+                  setUserFilters({ page: 1, limit: 20, search: '', role: '', status: undefined });
                 }}
               >
                 Effacer les filtres
@@ -593,6 +598,7 @@ const AdminPanel: React.FC = () => {
               <MenuItem value="inactive">Inactif</MenuItem>
             </Select>
           </FormControl>
+
           <Button 
             variant="outlined" 
             onClick={loadUsers}
@@ -603,15 +609,34 @@ const AdminPanel: React.FC = () => {
           </Button>
         </Box>
 
-        {/* Barre d'actions en masse */}
-        <BulkActionsBar
-          selectedCount={selectedUsers.length}
-          onActivate={handleBulkActivate}
-          onDeactivate={handleBulkDeactivate}
-          onDelete={handleBulkDelete}
-          onClear={clearSelection}
-          loading={bulkActionLoading}
-        />
+        {/* Barre d'actions en masse - Permanente et discrète */}
+        <Box sx={{ 
+          mb: 2, 
+          p: 1.5, 
+          bgcolor: selectedUsers.length > 0 
+            ? 'primary.light' 
+            : (theme) => theme.palette.mode === 'dark' 
+              ? 'rgba(255, 255, 255, 0.02)' 
+              : 'grey.100', 
+          borderRadius: 1, 
+          border: selectedUsers.length > 0 ? '1px solid' : '1px dashed',
+          borderColor: selectedUsers.length > 0 
+            ? 'primary.main' 
+            : (theme) => theme.palette.mode === 'dark' 
+              ? 'rgba(255, 255, 255, 0.1)' 
+              : 'grey.300',
+          transition: 'all 0.3s ease',
+          opacity: selectedUsers.length > 0 ? 1 : 0.7
+        }}>
+          <BulkActionsBar
+            selectedCount={selectedUsers.length}
+            onActivate={handleBulkActivate}
+            onDeactivate={handleBulkDeactivate}
+            onDelete={handleBulkDelete}
+            onClear={clearSelection}
+            loading={bulkActionLoading}
+          />
+        </Box>
 
         {/* Table */}
         <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 2 }}>
@@ -770,22 +795,62 @@ const AdminPanel: React.FC = () => {
           </Table>
         </TableContainer>
 
-        {/* Pagination */}
+        {/* Pagination avec nouveau layout */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 3 }}>
-          <Typography variant="body2" color="text.secondary">
-            Affichage de {((users.pagination.page - 1) * users.pagination.limit) + 1} à {Math.min(users.pagination.page * users.pagination.limit, users.pagination.total)} sur {users.pagination.total} utilisateurs
+          {/* Sélecteur Éléments par page - Bas gauche */}
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Éléments par page</InputLabel>
+            <Select
+              value={userFilters.limit}
+              onChange={(e) => {
+                const newLimit = Number(e.target.value);
+                setUserFilters({ ...userFilters, limit: newLimit, page: 1 });
+              }}
+              label="Éléments par page"
+            >
+              <MenuItem value={10}>10</MenuItem>
+              <MenuItem value={15}>15</MenuItem>
+              <MenuItem value={20}>20</MenuItem>
+              <MenuItem value={30}>30</MenuItem>
+              <MenuItem value={40}>40</MenuItem>
+              <MenuItem value={50}>50</MenuItem>
+              <MenuItem value={100}>100</MenuItem>
+              <MenuItem value={150}>150</MenuItem>
+              <MenuItem value={200}>200</MenuItem>
+              <MenuItem value={300}>300</MenuItem>
+              <MenuItem value={400}>400</MenuItem>
+              <MenuItem value={500}>500</MenuItem>
+              <MenuItem value={-1}>Tout</MenuItem>
+            </Select>
+          </FormControl>
+          
+          {/* Texte d'affichage - Centré */}
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+            {users && userFilters.limit === -1 ? (
+              `tous les ${users.pagination?.total || 0} utilisateurs`
+            ) : users ? (
+              `de ${((users.pagination.page - 1) * users.pagination.limit) + 1} à ${Math.min(users.pagination.page * users.pagination.limit, users.pagination.total)} utilisateurs sur ${users.pagination.total} utilisateurs`
+            ) : (
+              'Chargement...'
+            )}
           </Typography>
-          <Pagination
-            count={users.pagination.pages}
-            page={users.pagination.page}
-            onChange={(_, page) => {
-              setUserFilters({ ...userFilters, page });
-            }}
-            color="primary"
-            size="large"
-            showFirstButton
-            showLastButton
-          />
+          
+          {/* Pagination - Droite (ou message si une seule page) */}
+          {users && userFilters.limit !== -1 && users.pagination && users.pagination.pages > 1 ? (
+            <Pagination
+              count={users.pagination.pages}
+              page={users.pagination.page}
+              onChange={(_, page) => {
+                setUserFilters({ ...userFilters, page });
+              }}
+              color="primary"
+              size="large"
+              showFirstButton
+              showLastButton
+            />
+          ) : (
+            <Box sx={{ minWidth: 150 }} /> 
+          )}
         </Box>
       </Box>
     );

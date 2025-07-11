@@ -28,6 +28,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import NotificationButton from '../common/NotificationButton';
 
 const drawerWidth = 240;
 
@@ -151,6 +152,7 @@ const Navigation: React.FC<NavigationProps> = ({ window }) => {
             <Typography variant="body2" color="text.secondary">
               {user?.username}
             </Typography>
+            <NotificationButton />
             <IconButton
               size="small"
               aria-label="account of current user"

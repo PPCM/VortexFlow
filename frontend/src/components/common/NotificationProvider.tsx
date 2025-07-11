@@ -64,6 +64,7 @@ interface NotificationContextType {
   markAllAsRead: () => void;
   clearAll: () => void;
   unreadCount: number;
+  openDrawer: () => void;
 }
 
 // =====================================
@@ -343,6 +344,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     markAllAsRead,
     clearAll,
     unreadCount,
+    openDrawer: () => setDrawerOpen(true),
   };
 
   // =====================================
@@ -389,40 +391,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
       {/* Drawer des notifications */}
       <NotificationDrawer />
-      
-      {/* Bouton de notification flottant */}
-      <Box
-        sx={{
-          position: 'fixed',
-          bottom: 24,
-          right: 24,
-          zIndex: 1200,
-        }}
-      >
-        <Paper
-          elevation={4}
-          sx={{
-            p: 1,
-            cursor: 'pointer',
-            borderRadius: '50%',
-            width: 56,
-            height: 56,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'primary.main',
-            color: 'primary.contrastText',
-            '&:hover': {
-              backgroundColor: 'primary.dark',
-            },
-          }}
-          onClick={() => setDrawerOpen(true)}
-        >
-          <Badge badgeContent={unreadCount} color="error">
-            <Notifications />
-          </Badge>
-        </Paper>
-      </Box>
     </NotificationContext.Provider>
   );
 };
