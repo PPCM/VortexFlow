@@ -1,0 +1,186 @@
+23:08:55 [[33mwarn[39m]: Email service not configured - email features will be disabled
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0",
+  "hasHost": true,
+  "hasUser": true,
+  "hasPass": false
+}
+23:08:55 [[32minfo[39m]: WebSocket server initialized
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+23:08:55 [[32minfo[39m]: Simulation WebSocket handler initialized
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+23:08:55 [[32minfo[39m]: Connected to Redis
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+23:08:55 [[32minfo[39m]: Redis client ready
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+Executing (default): SELECT 1+1 AS result
+23:08:55 [[32minfo[39m]: Database connection established successfully
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+Executing (default): SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'
+Executing (default): SELECT t.typname enum_name, array_agg(e.enumlabel ORDER BY enumsortorder) enum_value FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname='enum_users_role' GROUP BY 1
+Executing (default): SELECT pk.constraint_type as "Constraint",c.column_name as "Field", c.column_default as "Default",c.is_nullable as "Null", (CASE WHEN c.udt_name = 'hstore' THEN c.udt_name ELSE c.data_type END) || (CASE WHEN c.character_maximum_length IS NOT NULL THEN '(' || c.character_maximum_length || ')' ELSE '' END) as "Type", (SELECT array_agg(e.enumlabel) FROM pg_catalog.pg_type t JOIN pg_catalog.pg_enum e ON t.oid=e.enumtypid WHERE t.typname=c.udt_name) AS "special", (SELECT pgd.description FROM pg_catalog.pg_statio_all_tables AS st INNER JOIN pg_catalog.pg_description pgd on (pgd.objoid=st.relid) WHERE c.ordinal_position=pgd.objsubid AND c.table_name=st.relname) AS "Comment" FROM information_schema.columns c LEFT JOIN (SELECT tc.table_schema, tc.table_name, cu.column_name, tc.constraint_type FROM information_schema.TABLE_CONSTRAINTS tc JOIN information_schema.KEY_COLUMN_USAGE  cu ON tc.table_schema=cu.table_schema and tc.table_name=cu.table_name and tc.constraint_name=cu.constraint_name and tc.constraint_type='PRIMARY KEY') pk ON pk.table_schema=c.table_schema AND pk.table_name=c.table_name AND pk.column_name=c.column_name WHERE c.table_name = 'users' AND c.table_schema = 'public'
+Executing (default): SELECT DISTINCT tc.constraint_name as constraint_name, tc.constraint_schema as constraint_schema, tc.constraint_catalog as constraint_catalog, tc.table_name as table_name,tc.table_schema as table_schema,tc.table_catalog as table_catalog,tc.initially_deferred as initially_deferred,tc.is_deferrable as is_deferrable,kcu.column_name as column_name,ccu.table_schema  AS referenced_table_schema,ccu.table_catalog  AS referenced_table_catalog,ccu.table_name  AS referenced_table_name,ccu.column_name AS referenced_column_name FROM information_schema.table_constraints AS tc JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name = 'users' AND tc.table_catalog = 'vortexflow'
+Executing (default): ALTER TABLE "users" ALTER COLUMN "email" SET NOT NULL;ALTER TABLE "users" ALTER COLUMN "email" DROP DEFAULT;ALTER TABLE "users"  ADD UNIQUE ("email");ALTER TABLE "users" ALTER COLUMN "email" TYPE VARCHAR(255)  ;
+Executing (default): ALTER TABLE "users" ALTER COLUMN "password_hash" SET NOT NULL;ALTER TABLE "users" ALTER COLUMN "password_hash" DROP DEFAULT;ALTER TABLE "users" ALTER COLUMN "password_hash" TYPE VARCHAR(255);
+Executing (default): ALTER TABLE "users" ALTER COLUMN "role" SET NOT NULL;ALTER TABLE "users" ALTER COLUMN "role" SET DEFAULT 'editor';DO 'BEGIN CREATE TYPE "public"."enum_users_role" AS ENUM(''viewer'', ''editor'', ''admin''); EXCEPTION WHEN duplicate_object THEN null; END';ALTER TABLE "users" ALTER COLUMN "role" TYPE "public"."enum_users_role" USING ("role"::"public"."enum_users_role");
+Executing (default): ALTER TABLE "users" ALTER COLUMN "first_name" DROP NOT NULL;ALTER TABLE "users" ALTER COLUMN "first_name" DROP DEFAULT;ALTER TABLE "users" ALTER COLUMN "first_name" TYPE VARCHAR(255);
+Executing (default): ALTER TABLE "users" ALTER COLUMN "last_name" DROP NOT NULL;ALTER TABLE "users" ALTER COLUMN "last_name" DROP DEFAULT;ALTER TABLE "users" ALTER COLUMN "last_name" TYPE VARCHAR(255);
+Executing (default): ALTER TABLE "users" ALTER COLUMN "is_active" DROP NOT NULL;ALTER TABLE "users" ALTER COLUMN "is_active" SET DEFAULT true;ALTER TABLE "users" ALTER COLUMN "is_active" TYPE BOOLEAN;
+Executing (default): ALTER TABLE "users" ALTER COLUMN "last_login" DROP NOT NULL;ALTER TABLE "users" ALTER COLUMN "last_login" DROP DEFAULT;ALTER TABLE "users" ALTER COLUMN "last_login" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): ALTER TABLE "users" ALTER COLUMN "preferences" DROP NOT NULL;ALTER TABLE "users" ALTER COLUMN "preferences" SET DEFAULT '{"theme":"light","notifications":{"email":true,"browser":true},"simulation":{"defaultSpeed":1,"showMetrics":true,"autoSave":true}}';ALTER TABLE "users" ALTER COLUMN "preferences" TYPE JSONB;
+Executing (default): ALTER TABLE "users" ALTER COLUMN "avatar_url" DROP NOT NULL;ALTER TABLE "users" ALTER COLUMN "avatar_url" DROP DEFAULT;ALTER TABLE "users" ALTER COLUMN "avatar_url" TYPE VARCHAR(255);
+Executing (default): ALTER TABLE "users" ALTER COLUMN "createdAt" SET NOT NULL;ALTER TABLE "users" ALTER COLUMN "createdAt" DROP DEFAULT;ALTER TABLE "users" ALTER COLUMN "createdAt" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): ALTER TABLE "users" ALTER COLUMN "updatedAt" SET NOT NULL;ALTER TABLE "users" ALTER COLUMN "updatedAt" DROP DEFAULT;ALTER TABLE "users" ALTER COLUMN "updatedAt" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): SELECT i.relname AS name, ix.indisprimary AS primary, ix.indisunique AS unique, ix.indkey AS indkey, array_agg(a.attnum) as column_indexes, array_agg(a.attname) AS column_names, pg_get_indexdef(ix.indexrelid) AS definition FROM pg_class t, pg_class i, pg_index ix, pg_attribute a WHERE t.oid = ix.indrelid AND i.oid = ix.indexrelid AND a.attrelid = t.oid AND t.relkind = 'r' and t.relname = 'users' GROUP BY i.relname, ix.indexrelid, ix.indisprimary, ix.indisunique, ix.indkey ORDER BY i.relname;
+Executing (default): SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'graphs'
+Executing (default): SELECT pk.constraint_type as "Constraint",c.column_name as "Field", c.column_default as "Default",c.is_nullable as "Null", (CASE WHEN c.udt_name = 'hstore' THEN c.udt_name ELSE c.data_type END) || (CASE WHEN c.character_maximum_length IS NOT NULL THEN '(' || c.character_maximum_length || ')' ELSE '' END) as "Type", (SELECT array_agg(e.enumlabel) FROM pg_catalog.pg_type t JOIN pg_catalog.pg_enum e ON t.oid=e.enumtypid WHERE t.typname=c.udt_name) AS "special", (SELECT pgd.description FROM pg_catalog.pg_statio_all_tables AS st INNER JOIN pg_catalog.pg_description pgd on (pgd.objoid=st.relid) WHERE c.ordinal_position=pgd.objsubid AND c.table_name=st.relname) AS "Comment" FROM information_schema.columns c LEFT JOIN (SELECT tc.table_schema, tc.table_name, cu.column_name, tc.constraint_type FROM information_schema.TABLE_CONSTRAINTS tc JOIN information_schema.KEY_COLUMN_USAGE  cu ON tc.table_schema=cu.table_schema and tc.table_name=cu.table_name and tc.constraint_name=cu.constraint_name and tc.constraint_type='PRIMARY KEY') pk ON pk.table_schema=c.table_schema AND pk.table_name=c.table_name AND pk.column_name=c.column_name WHERE c.table_name = 'graphs' AND c.table_schema = 'public'
+Executing (default): SELECT DISTINCT tc.constraint_name as constraint_name, tc.constraint_schema as constraint_schema, tc.constraint_catalog as constraint_catalog, tc.table_name as table_name,tc.table_schema as table_schema,tc.table_catalog as table_catalog,tc.initially_deferred as initially_deferred,tc.is_deferrable as is_deferrable,kcu.column_name as column_name,ccu.table_schema  AS referenced_table_schema,ccu.table_catalog  AS referenced_table_catalog,ccu.table_name  AS referenced_table_name,ccu.column_name AS referenced_column_name FROM information_schema.table_constraints AS tc JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name = 'graphs' AND tc.table_catalog = 'vortexflow'
+Executing (default): ALTER TABLE "graphs" DROP CONSTRAINT "graphs_user_id_fkey"
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "user_id" SET NOT NULL;ALTER TABLE "graphs"  ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "title" SET NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "title" DROP DEFAULT;ALTER TABLE "graphs" ALTER COLUMN "title" TYPE VARCHAR(255);
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "description" DROP NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "description" DROP DEFAULT;ALTER TABLE "graphs" ALTER COLUMN "description" TYPE TEXT;
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "dot_code" SET NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "dot_code" DROP DEFAULT;ALTER TABLE "graphs" ALTER COLUMN "dot_code" TYPE TEXT;
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "simulation_config" DROP NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "simulation_config" SET DEFAULT '{"speed":1,"showParticles":true,"showMetrics":true,"maxParticles":100,"particleSize":2,"particleColors":{"default":"#4CAF50","packets":"#2196F3","queries":"#FF9800","data":"#9C27B0"},"physics":{"gravity":0.1,"damping":0.9,"repulsion":1000}}';ALTER TABLE "graphs" ALTER COLUMN "simulation_config" TYPE JSONB;
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "visual_settings" DROP NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "visual_settings" SET DEFAULT '{"layout":"force-directed","nodeSize":10,"edgeWidth":2,"nodeColors":{"default":"#42A5F5","router":"#FF7043","server":"#66BB6A","database":"#AB47BC"},"backgroundColor":"#1a1a1a","showLabels":true,"show3D":true}';ALTER TABLE "graphs" ALTER COLUMN "visual_settings" TYPE JSONB;
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "is_public" DROP NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "is_public" SET DEFAULT false;ALTER TABLE "graphs" ALTER COLUMN "is_public" TYPE BOOLEAN;
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "tags" DROP NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "tags" SET DEFAULT ARRAY[]::VARCHAR(255)[];ALTER TABLE "graphs" ALTER COLUMN "tags" TYPE VARCHAR(255)[];
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "category" DROP NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "category" DROP DEFAULT;ALTER TABLE "graphs" ALTER COLUMN "category" TYPE VARCHAR(255);
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "version" DROP NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "version" SET DEFAULT 1;ALTER TABLE "graphs" ALTER COLUMN "version" TYPE INTEGER;
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "view_count" DROP NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "view_count" SET DEFAULT 0;ALTER TABLE "graphs" ALTER COLUMN "view_count" TYPE INTEGER;
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "is_template" DROP NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "is_template" SET DEFAULT false;ALTER TABLE "graphs" ALTER COLUMN "is_template" TYPE BOOLEAN;
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "template_category" DROP NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "template_category" DROP DEFAULT;ALTER TABLE "graphs" ALTER COLUMN "template_category" TYPE VARCHAR(255);
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "last_simulation" DROP NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "last_simulation" DROP DEFAULT;ALTER TABLE "graphs" ALTER COLUMN "last_simulation" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "performance_metrics" DROP NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "performance_metrics" SET DEFAULT '{"avgFrameRate":0,"maxNodes":0,"maxEdges":0,"renderTime":0}';ALTER TABLE "graphs" ALTER COLUMN "performance_metrics" TYPE JSONB;
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "createdAt" SET NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "createdAt" DROP DEFAULT;ALTER TABLE "graphs" ALTER COLUMN "createdAt" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): ALTER TABLE "graphs" ALTER COLUMN "updatedAt" SET NOT NULL;ALTER TABLE "graphs" ALTER COLUMN "updatedAt" DROP DEFAULT;ALTER TABLE "graphs" ALTER COLUMN "updatedAt" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): SELECT i.relname AS name, ix.indisprimary AS primary, ix.indisunique AS unique, ix.indkey AS indkey, array_agg(a.attnum) as column_indexes, array_agg(a.attname) AS column_names, pg_get_indexdef(ix.indexrelid) AS definition FROM pg_class t, pg_class i, pg_index ix, pg_attribute a WHERE t.oid = ix.indrelid AND i.oid = ix.indexrelid AND a.attrelid = t.oid AND t.relkind = 'r' and t.relname = 'graphs' GROUP BY i.relname, ix.indexrelid, ix.indisprimary, ix.indisunique, ix.indkey ORDER BY i.relname;
+Executing (default): SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'graph_versions'
+Executing (default): SELECT pk.constraint_type as "Constraint",c.column_name as "Field", c.column_default as "Default",c.is_nullable as "Null", (CASE WHEN c.udt_name = 'hstore' THEN c.udt_name ELSE c.data_type END) || (CASE WHEN c.character_maximum_length IS NOT NULL THEN '(' || c.character_maximum_length || ')' ELSE '' END) as "Type", (SELECT array_agg(e.enumlabel) FROM pg_catalog.pg_type t JOIN pg_catalog.pg_enum e ON t.oid=e.enumtypid WHERE t.typname=c.udt_name) AS "special", (SELECT pgd.description FROM pg_catalog.pg_statio_all_tables AS st INNER JOIN pg_catalog.pg_description pgd on (pgd.objoid=st.relid) WHERE c.ordinal_position=pgd.objsubid AND c.table_name=st.relname) AS "Comment" FROM information_schema.columns c LEFT JOIN (SELECT tc.table_schema, tc.table_name, cu.column_name, tc.constraint_type FROM information_schema.TABLE_CONSTRAINTS tc JOIN information_schema.KEY_COLUMN_USAGE  cu ON tc.table_schema=cu.table_schema and tc.table_name=cu.table_name and tc.constraint_name=cu.constraint_name and tc.constraint_type='PRIMARY KEY') pk ON pk.table_schema=c.table_schema AND pk.table_name=c.table_name AND pk.column_name=c.column_name WHERE c.table_name = 'graph_versions' AND c.table_schema = 'public'
+Executing (default): SELECT DISTINCT tc.constraint_name as constraint_name, tc.constraint_schema as constraint_schema, tc.constraint_catalog as constraint_catalog, tc.table_name as table_name,tc.table_schema as table_schema,tc.table_catalog as table_catalog,tc.initially_deferred as initially_deferred,tc.is_deferrable as is_deferrable,kcu.column_name as column_name,ccu.table_schema  AS referenced_table_schema,ccu.table_catalog  AS referenced_table_catalog,ccu.table_name  AS referenced_table_name,ccu.column_name AS referenced_column_name FROM information_schema.table_constraints AS tc JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name = 'graph_versions' AND tc.table_catalog = 'vortexflow'
+Executing (default): ALTER TABLE "graph_versions" DROP CONSTRAINT "graph_versions_graph_id_fkey"
+Executing (default): ALTER TABLE "graph_versions" ALTER COLUMN "graph_id" SET NOT NULL;ALTER TABLE "graph_versions"  ADD FOREIGN KEY ("graph_id") REFERENCES "graphs" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
+Executing (default): ALTER TABLE "graph_versions" ALTER COLUMN "version_number" SET NOT NULL;ALTER TABLE "graph_versions" ALTER COLUMN "version_number" DROP DEFAULT;ALTER TABLE "graph_versions" ALTER COLUMN "version_number" TYPE INTEGER;
+Executing (default): ALTER TABLE "graph_versions" ALTER COLUMN "dot_code" SET NOT NULL;ALTER TABLE "graph_versions" ALTER COLUMN "dot_code" DROP DEFAULT;ALTER TABLE "graph_versions" ALTER COLUMN "dot_code" TYPE TEXT;
+Executing (default): ALTER TABLE "graph_versions" ALTER COLUMN "simulation_config" DROP NOT NULL;ALTER TABLE "graph_versions" ALTER COLUMN "simulation_config" DROP DEFAULT;ALTER TABLE "graph_versions" ALTER COLUMN "simulation_config" TYPE JSONB;
+Executing (default): ALTER TABLE "graph_versions" ALTER COLUMN "visual_settings" DROP NOT NULL;ALTER TABLE "graph_versions" ALTER COLUMN "visual_settings" DROP DEFAULT;ALTER TABLE "graph_versions" ALTER COLUMN "visual_settings" TYPE JSONB;
+Executing (default): ALTER TABLE "graph_versions" ALTER COLUMN "notes" DROP NOT NULL;ALTER TABLE "graph_versions" ALTER COLUMN "notes" DROP DEFAULT;ALTER TABLE "graph_versions" ALTER COLUMN "notes" TYPE TEXT;
+Executing (default): ALTER TABLE "graph_versions" ALTER COLUMN "is_major_version" DROP NOT NULL;ALTER TABLE "graph_versions" ALTER COLUMN "is_major_version" SET DEFAULT false;ALTER TABLE "graph_versions" ALTER COLUMN "is_major_version" TYPE BOOLEAN;
+Executing (default): ALTER TABLE "graph_versions" ALTER COLUMN "changes_summary" DROP NOT NULL;ALTER TABLE "graph_versions" ALTER COLUMN "changes_summary" DROP DEFAULT;ALTER TABLE "graph_versions" ALTER COLUMN "changes_summary" TYPE TEXT;
+Executing (default): ALTER TABLE "graph_versions" ALTER COLUMN "createdAt" SET NOT NULL;ALTER TABLE "graph_versions" ALTER COLUMN "createdAt" DROP DEFAULT;ALTER TABLE "graph_versions" ALTER COLUMN "createdAt" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): ALTER TABLE "graph_versions" ALTER COLUMN "updatedAt" SET NOT NULL;ALTER TABLE "graph_versions" ALTER COLUMN "updatedAt" DROP DEFAULT;ALTER TABLE "graph_versions" ALTER COLUMN "updatedAt" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): SELECT i.relname AS name, ix.indisprimary AS primary, ix.indisunique AS unique, ix.indkey AS indkey, array_agg(a.attnum) as column_indexes, array_agg(a.attname) AS column_names, pg_get_indexdef(ix.indexrelid) AS definition FROM pg_class t, pg_class i, pg_index ix, pg_attribute a WHERE t.oid = ix.indrelid AND i.oid = ix.indexrelid AND a.attrelid = t.oid AND t.relkind = 'r' and t.relname = 'graph_versions' GROUP BY i.relname, ix.indexrelid, ix.indisprimary, ix.indisunique, ix.indkey ORDER BY i.relname;
+Executing (default): SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'graph_shares'
+Executing (default): SELECT t.typname enum_name, array_agg(e.enumlabel ORDER BY enumsortorder) enum_value FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname='enum_graph_shares_permission_level' GROUP BY 1
+Executing (default): SELECT pk.constraint_type as "Constraint",c.column_name as "Field", c.column_default as "Default",c.is_nullable as "Null", (CASE WHEN c.udt_name = 'hstore' THEN c.udt_name ELSE c.data_type END) || (CASE WHEN c.character_maximum_length IS NOT NULL THEN '(' || c.character_maximum_length || ')' ELSE '' END) as "Type", (SELECT array_agg(e.enumlabel) FROM pg_catalog.pg_type t JOIN pg_catalog.pg_enum e ON t.oid=e.enumtypid WHERE t.typname=c.udt_name) AS "special", (SELECT pgd.description FROM pg_catalog.pg_statio_all_tables AS st INNER JOIN pg_catalog.pg_description pgd on (pgd.objoid=st.relid) WHERE c.ordinal_position=pgd.objsubid AND c.table_name=st.relname) AS "Comment" FROM information_schema.columns c LEFT JOIN (SELECT tc.table_schema, tc.table_name, cu.column_name, tc.constraint_type FROM information_schema.TABLE_CONSTRAINTS tc JOIN information_schema.KEY_COLUMN_USAGE  cu ON tc.table_schema=cu.table_schema and tc.table_name=cu.table_name and tc.constraint_name=cu.constraint_name and tc.constraint_type='PRIMARY KEY') pk ON pk.table_schema=c.table_schema AND pk.table_name=c.table_name AND pk.column_name=c.column_name WHERE c.table_name = 'graph_shares' AND c.table_schema = 'public'
+Executing (default): SELECT DISTINCT tc.constraint_name as constraint_name, tc.constraint_schema as constraint_schema, tc.constraint_catalog as constraint_catalog, tc.table_name as table_name,tc.table_schema as table_schema,tc.table_catalog as table_catalog,tc.initially_deferred as initially_deferred,tc.is_deferrable as is_deferrable,kcu.column_name as column_name,ccu.table_schema  AS referenced_table_schema,ccu.table_catalog  AS referenced_table_catalog,ccu.table_name  AS referenced_table_name,ccu.column_name AS referenced_column_name FROM information_schema.table_constraints AS tc JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name = 'graph_shares' AND tc.table_catalog = 'vortexflow'
+Executing (default): ALTER TABLE "graph_shares" DROP CONSTRAINT "graph_shares_graph_id_fkey"
+Executing (default): ALTER TABLE "graph_shares" ALTER COLUMN "graph_id" SET NOT NULL;ALTER TABLE "graph_shares"  ADD FOREIGN KEY ("graph_id") REFERENCES "graphs" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
+Executing (default): ALTER TABLE "graph_shares" DROP CONSTRAINT "graph_shares_shared_by_user_id_fkey"
+Executing (default): ALTER TABLE "graph_shares" DROP CONSTRAINT "graph_shares_shared_with_user_id_fkey"
+Executing (default): ALTER TABLE "graph_shares" ALTER COLUMN "shared_with_user_id" SET NOT NULL;ALTER TABLE "graph_shares"  ADD FOREIGN KEY ("shared_with_user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
+Executing (default): ALTER TABLE "graph_shares" ALTER COLUMN "permission_level" SET NOT NULL;ALTER TABLE "graph_shares" ALTER COLUMN "permission_level" SET DEFAULT 'view';DO 'BEGIN CREATE TYPE "public"."enum_graph_shares_permission_level" AS ENUM(''view'', ''edit'', ''admin''); EXCEPTION WHEN duplicate_object THEN null; END';ALTER TABLE "graph_shares" ALTER COLUMN "permission_level" TYPE "public"."enum_graph_shares_permission_level" USING ("permission_level"::"public"."enum_graph_shares_permission_level");
+Executing (default): ALTER TABLE "graph_shares"  ADD FOREIGN KEY ("shared_by_user_id") REFERENCES "users" ("id");
+Executing (default): ALTER TABLE "graph_shares" ALTER COLUMN "share_token" DROP NOT NULL;ALTER TABLE "graph_shares" ALTER COLUMN "share_token" DROP DEFAULT;ALTER TABLE "graph_shares"  ADD UNIQUE ("share_token");ALTER TABLE "graph_shares" ALTER COLUMN "share_token" TYPE VARCHAR(255) ;
+Executing (default): ALTER TABLE "graph_shares" ALTER COLUMN "expires_at" DROP NOT NULL;ALTER TABLE "graph_shares" ALTER COLUMN "expires_at" DROP DEFAULT;ALTER TABLE "graph_shares" ALTER COLUMN "expires_at" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): ALTER TABLE "graph_shares" ALTER COLUMN "is_active" DROP NOT NULL;ALTER TABLE "graph_shares" ALTER COLUMN "is_active" SET DEFAULT true;ALTER TABLE "graph_shares" ALTER COLUMN "is_active" TYPE BOOLEAN;
+Executing (default): ALTER TABLE "graph_shares" ALTER COLUMN "access_count" DROP NOT NULL;ALTER TABLE "graph_shares" ALTER COLUMN "access_count" SET DEFAULT 0;ALTER TABLE "graph_shares" ALTER COLUMN "access_count" TYPE INTEGER;
+Executing (default): ALTER TABLE "graph_shares" ALTER COLUMN "last_accessed" DROP NOT NULL;ALTER TABLE "graph_shares" ALTER COLUMN "last_accessed" DROP DEFAULT;ALTER TABLE "graph_shares" ALTER COLUMN "last_accessed" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): ALTER TABLE "graph_shares" ALTER COLUMN "notes" DROP NOT NULL;ALTER TABLE "graph_shares" ALTER COLUMN "notes" DROP DEFAULT;ALTER TABLE "graph_shares" ALTER COLUMN "notes" TYPE TEXT;
+Executing (default): ALTER TABLE "graph_shares" ALTER COLUMN "createdAt" SET NOT NULL;ALTER TABLE "graph_shares" ALTER COLUMN "createdAt" DROP DEFAULT;ALTER TABLE "graph_shares" ALTER COLUMN "createdAt" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): ALTER TABLE "graph_shares" ALTER COLUMN "updatedAt" SET NOT NULL;ALTER TABLE "graph_shares" ALTER COLUMN "updatedAt" DROP DEFAULT;ALTER TABLE "graph_shares" ALTER COLUMN "updatedAt" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): SELECT i.relname AS name, ix.indisprimary AS primary, ix.indisunique AS unique, ix.indkey AS indkey, array_agg(a.attnum) as column_indexes, array_agg(a.attname) AS column_names, pg_get_indexdef(ix.indexrelid) AS definition FROM pg_class t, pg_class i, pg_index ix, pg_attribute a WHERE t.oid = ix.indrelid AND i.oid = ix.indexrelid AND a.attrelid = t.oid AND t.relkind = 'r' and t.relname = 'graph_shares' GROUP BY i.relname, ix.indexrelid, ix.indisprimary, ix.indisunique, ix.indkey ORDER BY i.relname;
+Executing (default): SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'simulation_sessions'
+Executing (default): SELECT t.typname enum_name, array_agg(e.enumlabel ORDER BY enumsortorder) enum_value FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace WHERE n.nspname = 'public' AND t.typname='enum_simulation_sessions_status' GROUP BY 1
+Executing (default): SELECT pk.constraint_type as "Constraint",c.column_name as "Field", c.column_default as "Default",c.is_nullable as "Null", (CASE WHEN c.udt_name = 'hstore' THEN c.udt_name ELSE c.data_type END) || (CASE WHEN c.character_maximum_length IS NOT NULL THEN '(' || c.character_maximum_length || ')' ELSE '' END) as "Type", (SELECT array_agg(e.enumlabel) FROM pg_catalog.pg_type t JOIN pg_catalog.pg_enum e ON t.oid=e.enumtypid WHERE t.typname=c.udt_name) AS "special", (SELECT pgd.description FROM pg_catalog.pg_statio_all_tables AS st INNER JOIN pg_catalog.pg_description pgd on (pgd.objoid=st.relid) WHERE c.ordinal_position=pgd.objsubid AND c.table_name=st.relname) AS "Comment" FROM information_schema.columns c LEFT JOIN (SELECT tc.table_schema, tc.table_name, cu.column_name, tc.constraint_type FROM information_schema.TABLE_CONSTRAINTS tc JOIN information_schema.KEY_COLUMN_USAGE  cu ON tc.table_schema=cu.table_schema and tc.table_name=cu.table_name and tc.constraint_name=cu.constraint_name and tc.constraint_type='PRIMARY KEY') pk ON pk.table_schema=c.table_schema AND pk.table_name=c.table_name AND pk.column_name=c.column_name WHERE c.table_name = 'simulation_sessions' AND c.table_schema = 'public'
+Executing (default): SELECT DISTINCT tc.constraint_name as constraint_name, tc.constraint_schema as constraint_schema, tc.constraint_catalog as constraint_catalog, tc.table_name as table_name,tc.table_schema as table_schema,tc.table_catalog as table_catalog,tc.initially_deferred as initially_deferred,tc.is_deferrable as is_deferrable,kcu.column_name as column_name,ccu.table_schema  AS referenced_table_schema,ccu.table_catalog  AS referenced_table_catalog,ccu.table_name  AS referenced_table_name,ccu.column_name AS referenced_column_name FROM information_schema.table_constraints AS tc JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name = 'simulation_sessions' AND tc.table_catalog = 'vortexflow'
+Executing (default): ALTER TABLE "simulation_sessions" DROP CONSTRAINT "simulation_sessions_graph_id_fkey"
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "graph_id" SET NOT NULL;ALTER TABLE "simulation_sessions"  ADD FOREIGN KEY ("graph_id") REFERENCES "graphs" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
+Executing (default): ALTER TABLE "simulation_sessions" DROP CONSTRAINT "simulation_sessions_user_id_fkey"
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "user_id" SET NOT NULL;ALTER TABLE "simulation_sessions"  ADD FOREIGN KEY ("user_id") REFERENCES "users" ("id") ON DELETE CASCADE ON UPDATE CASCADE;
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "session_name" DROP NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "session_name" DROP DEFAULT;ALTER TABLE "simulation_sessions" ALTER COLUMN "session_name" TYPE VARCHAR(255);
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "session_data" SET NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "session_data" SET DEFAULT '{"frames":[],"metrics":{"totalPackets":0,"avgLatency":0,"maxThroughput":0,"nodeUtilization":{}},"events":[],"config":{}}';ALTER TABLE "simulation_sessions" ALTER COLUMN "session_data" TYPE JSONB;
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "duration" SET NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "duration" SET DEFAULT 0;ALTER TABLE "simulation_sessions" ALTER COLUMN "duration" TYPE INTEGER;
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "status" DROP NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "status" SET DEFAULT 'running';DO 'BEGIN CREATE TYPE "public"."enum_simulation_sessions_status" AS ENUM(''running'', ''paused'', ''completed'', ''failed''); EXCEPTION WHEN duplicate_object THEN null; END';ALTER TABLE "simulation_sessions" ALTER COLUMN "status" TYPE "public"."enum_simulation_sessions_status" USING ("status"::"public"."enum_simulation_sessions_status");
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "start_time" SET NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "start_time" DROP DEFAULT;ALTER TABLE "simulation_sessions" ALTER COLUMN "start_time" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "end_time" DROP NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "end_time" DROP DEFAULT;ALTER TABLE "simulation_sessions" ALTER COLUMN "end_time" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "simulation_config" DROP NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "simulation_config" DROP DEFAULT;ALTER TABLE "simulation_sessions" ALTER COLUMN "simulation_config" TYPE JSONB;
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "performance_metrics" DROP NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "performance_metrics" SET DEFAULT '{"avgFps":0,"minFps":0,"maxFps":0,"totalFrames":0,"droppedFrames":0,"memoryUsage":0}';ALTER TABLE "simulation_sessions" ALTER COLUMN "performance_metrics" TYPE JSONB;
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "is_saved" DROP NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "is_saved" SET DEFAULT false;ALTER TABLE "simulation_sessions" ALTER COLUMN "is_saved" TYPE BOOLEAN;
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "tags" DROP NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "tags" SET DEFAULT ARRAY[]::VARCHAR(255)[];ALTER TABLE "simulation_sessions" ALTER COLUMN "tags" TYPE VARCHAR(255)[];
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "notes" DROP NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "notes" DROP DEFAULT;ALTER TABLE "simulation_sessions" ALTER COLUMN "notes" TYPE TEXT;
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "createdAt" SET NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "createdAt" DROP DEFAULT;ALTER TABLE "simulation_sessions" ALTER COLUMN "createdAt" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): ALTER TABLE "simulation_sessions" ALTER COLUMN "updatedAt" SET NOT NULL;ALTER TABLE "simulation_sessions" ALTER COLUMN "updatedAt" DROP DEFAULT;ALTER TABLE "simulation_sessions" ALTER COLUMN "updatedAt" TYPE TIMESTAMP WITH TIME ZONE;
+Executing (default): SELECT i.relname AS name, ix.indisprimary AS primary, ix.indisunique AS unique, ix.indkey AS indkey, array_agg(a.attnum) as column_indexes, array_agg(a.attname) AS column_names, pg_get_indexdef(ix.indexrelid) AS definition FROM pg_class t, pg_class i, pg_index ix, pg_attribute a WHERE t.oid = ix.indrelid AND i.oid = ix.indexrelid AND a.attrelid = t.oid AND t.relkind = 'r' and t.relname = 'simulation_sessions' GROUP BY i.relname, ix.indexrelid, ix.indisprimary, ix.indisunique, ix.indkey ORDER BY i.relname;
+23:08:55 [[32minfo[39m]: Database models synchronized
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+Executing (default): SELECT "id", "email", "password_hash", "role", "first_name", "last_name", "is_active", "last_login", "preferences", "avatar_url", "createdAt", "updatedAt" FROM "users" AS "User" WHERE "User"."email" = 'admin@admin.com';
+23:08:55 [[32minfo[39m]: Admin user already exists
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0",
+  "email": "admin@admin.com"
+}
+23:08:55 [[32minfo[39m]: 🚀 VortexFlow Backend Server running on http://192.168.5.30:5000
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+23:08:55 [[32minfo[39m]: 📊 Health check available at http://192.168.5.30:5000/api/health
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+23:08:55 [[32minfo[39m]: 🔌 WebSocket server running on ws://192.168.5.30:5000
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+23:09:32 [[32minfo[39m]: 192.168.5.30 - - [11/Jul/2025:21:09:32 +0000] "GET /api/health HTTP/1.1" 200 72 "-" "curl/7.88.1"
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+23:10:20 [[32minfo[39m]: 192.168.15.14 - - [11/Jul/2025:21:10:20 +0000] "GET /api/auth/me?_t=1752268220286 HTTP/1.1" 404 103 "http://192.168.5.30:3000/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0"
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+23:16:05 [[32minfo[39m]: SIGTERM received, shutting down gracefully
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+23:16:05 [[32minfo[39m]: Cleaning up simulation handler
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+23:16:05 [[32minfo[39m]: HTTP server closed
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}
+23:16:05 [[32minfo[39m]: Database connection closed
+{
+  "service": "vortexflow-backend",
+  "version": "1.0.0"
+}

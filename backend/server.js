@@ -123,10 +123,15 @@ app.use(session({
   name: process.env.SESSION_NAME || 'vortexflow-session',
   resave: false,
   saveUninitialized: false,
+  rolling: true, // Renouveler la session à chaque requête
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: parseInt(process.env.SESSION_MAX_AGE) || 24 * 60 * 60 * 1000 // 24 hours
+    // Durée minimale de 1 heure, ou la valeur configurée si elle est plus élevée
+    maxAge: Math.max(
+      parseInt(process.env.SESSION_MAX_AGE) || 60 * 60 * 1000, // 1 heure par défaut
+      60 * 60 * 1000 // Minimum 1 heure
+    )
   }
 }));
 

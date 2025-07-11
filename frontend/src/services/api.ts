@@ -46,8 +46,15 @@ class ApiService {
         
         // Gestion des erreurs d'authentification
         if (error.response?.status === 401) {
-          // Rediriger vers login si non authentifié
-          window.location.href = '/login';
+          const currentPath = window.location.pathname;
+          
+          // Ne rediriger que si on n'est pas déjà sur la page de login
+          if (currentPath !== '/login' && currentPath !== '/register') {
+            console.warn('Session expirée, redirection vers login');
+            // Stocker la page actuelle pour redirection après login
+            sessionStorage.setItem('vortexflow_redirect_after_login', currentPath);
+            window.location.href = '/login';
+          }
         }
         
         // Gestion des erreurs serveur
@@ -120,8 +127,22 @@ class ApiService {
   }
 
   async getCurrentUser(): Promise<ApiResponse<User>> {
-    const response = await this.client.get('/auth/me');
-    return response.data;
+    const response = await this.client.get('/auth/session');
+    // L'endpoint /auth/session retourne {authenticated: true, user: {...}}
+    // Adapter au format ApiResponse attendu
+    if (response.data.authenticated && response.data.user) {
+      return {
+        success: true,
+        data: response.data.user,
+        message: 'Session valide'
+      };
+    } else {
+      return {
+        success: false,
+        data: null as any,
+        message: 'Session invalide'
+      };
+    }
   }
 
   async refreshSession(): Promise<ApiResponse<User>> {

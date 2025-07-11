@@ -116,6 +116,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   // =====================================
+  // Rafraîchissement automatique de la session
+  // =====================================
+  useEffect(() => {
+    let refreshInterval: NodeJS.Timeout;
+    
+    if (state.isAuthenticated) {
+      // Rafraîchir la session toutes les 30 minutes
+      refreshInterval = setInterval(async () => {
+        try {
+          const response = await apiService.getCurrentUser();
+          if (response.success && response.data) {
+            dispatch({ type: 'SET_USER', payload: response.data });
+            console.log('Session rafraîchie automatiquement');
+          } else {
+            console.warn('Session expirée, déconnexion');
+            dispatch({ type: 'LOGOUT' });
+          }
+        } catch (error) {
+          console.warn('Erreur lors du rafraîchissement de session:', error);
+          // Ne pas déconnecter automatiquement en cas d'erreur réseau temporaire
+        }
+      }, 30 * 60 * 1000); // 30 minutes
+    }
+
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, [state.isAuthenticated]);
+
+  // =====================================
   // Fonction de Connexion
   // =====================================
   const login = async (credentials: LoginCredentials): Promise<boolean> => {

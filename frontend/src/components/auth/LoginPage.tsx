@@ -86,7 +86,15 @@ const LoginPage: React.FC = () => {
     const success = await login(credentials);
     
     if (success) {
-      navigate('/dashboard');
+      // Récupérer la page de redirection stockée ou aller au dashboard par défaut
+      const redirectPath = sessionStorage.getItem('vortexflow_redirect_after_login');
+      
+      if (redirectPath && redirectPath !== '/login' && redirectPath !== '/register') {
+        sessionStorage.removeItem('vortexflow_redirect_after_login');
+        navigate(redirectPath);
+      } else {
+        navigate('/dashboard');
+      }
     }
   };
 
