@@ -433,24 +433,25 @@ digraph example {
               <Tab icon={<Visibility />} label="Aperçu 3D" />
             </Tabs>
             
-            <Box sx={{ flexGrow: 1, p: 0 }}>
+            <Box sx={{ flexGrow: 1, p: 0, height: 'calc(100vh - 200px)' }}>
               <TabPanel value={currentTab} index={0}>
-                <Box sx={{ height: '450px', width: '100%' }}>
+                <Box sx={{ height: '100%', width: '100%' }}>
                   <DOTCodeMirrorEditor
                     value={dotContent}
                     onChange={handleDotContentChange}
-                    height="450px"
+                    height="100%"
                   />
                 </Box>
               </TabPanel>
               
               <TabPanel value={currentTab} index={1}>
-                <GraphRenderer3D
-                  dotContent={dotContent}
-                  isValid={validationResult?.isValid ?? false}
-                  parsedData={validationResult?.parsedGraph}
-                  height={450}
-                />
+                <Box sx={{ height: '100%', width: '100%' }}>
+                  <GraphRenderer3D
+                    dotContent={dotContent}
+                    isValid={validationResult?.isValid ?? false}
+                    parsedData={validationResult?.parsedGraph}
+                  />
+                </Box>
               </TabPanel>
             </Box>
           </Paper>

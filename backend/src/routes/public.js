@@ -107,9 +107,10 @@ router.get('/dot-examples',
  */
 router.post('/validate-dot',
   asyncHandler(async (req, res) => {
-    const { code } = req.body;
+    const { dotCode, code } = req.body;
+    const dotContent = dotCode || code; // Support both formats for compatibility
     
-    if (!code) {
+    if (!dotContent) {
       return res.status(400).json({
         error: 'DOT code is required',
         code: 'DOT_CODE_REQUIRED'
@@ -117,10 +118,23 @@ router.post('/validate-dot',
     }
     
     try {
-      const result = dotValidator.validate(code);
-      res.json(result);
+      const result = await dotValidator.validate(dotContent);
+      
+      // Return in the same format as the authenticated endpoint
+      res.json({
+        success: true,
+        data: {
+          isValid: result.valid,
+          valid: result.valid, // Legacy compatibility
+          errors: result.errors || [],
+          warnings: result.warnings || [],
+          metadata: result.metadata || {}
+        }
+      });
     } catch (error) {
+      logger.error('DOT validation error:', error);
       res.status(400).json({
+        success: false,
         error: 'Validation failed',
         code: 'VALIDATION_ERROR',
         details: error.message

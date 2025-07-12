@@ -1,11 +1,9 @@
-// VortexFlow Frontend - Rendu 3D des Graphiques DOT
-// Composant de visualisation 3D utilisant Three.js pour les graphiques DOT
+// VortexFlow Frontend - Rendu 3D des Graphiques DOT avec 3d-force-graph
+// Composant de visualisation 3D avancé avec flèches, particules et texte
 
-import React, { useRef, useMemo, useEffect, useState } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Text, Sphere, Line } from '@react-three/drei';
-import { Vector3, Color } from 'three';
-import { Box, Typography, Alert, CircularProgress } from '@mui/material';
+import React, { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react';
+import { Box, Typography, Alert, CircularProgress, Button, Paper, Tooltip, Card, CardContent } from '@mui/material';
+import ForceGraph3D from '3d-force-graph';
 import { GraphData, GraphNode, GraphEdge } from '../../types';
 
 // =====================================
@@ -15,236 +13,169 @@ interface GraphRenderer3DProps {
   dotContent: string;
   isValid: boolean;
   parsedData?: GraphData;
-  width?: number;
-  height?: number;
 }
 
-interface Node3D {
+// Types pour 3d-force-graph
+interface ForceGraphNode {
   id: string;
-  position: Vector3;
-  label: string;
-  color: string;
-  size: number;
+  name: string;
+  group: number;
+  x?: number;
+  y?: number;
+  z?: number;
+  val?: number;
+  color?: string;
 }
 
-interface Edge3D {
-  id: string;
-  source: Node3D;
-  target: Node3D;
-  color: string;
-  points: Vector3[];
+interface ForceGraphLink {
+  source: string;
+  target: string;
+  value?: number;
+  color?: string;
+  name?: string;
 }
 
 // =====================================
 // Utilitaires de parsing DOT vers 3D
 // =====================================
 class DotTo3DConverter {
-  static parseDotToGraphData(dotContent: string): GraphData {
-    // Parser simple pour DOT - En production, utiliser une vraie librairie comme viz.js
-    const nodes: GraphNode[] = [];
-    const edges: GraphEdge[] = [];
+  static parseDotToGraphData(dotContent: string): { nodes: ForceGraphNode[], links: ForceGraphLink[] } {
+    const nodes: ForceGraphNode[] = [];
+    const links: ForceGraphLink[] = [];
+    const nodeMap = new Map<string, ForceGraphNode>();
     
-    // Extraire les nœuds (A, B, C etc.)
-    const nodeMatches = dotContent.match(/\b[A-Za-z][A-Za-z0-9_]*\b(?=\s*[\[;->])/g);
-    const uniqueNodes = Array.from(new Set(nodeMatches || []));
+    // Nettoyer le contenu DOT et supprimer tout ce qui n'est pas essentiel
+    let cleanContent = dotContent
+      .replace(/\/\*[\s\S]*?\*\//g, '') // Commentaires /* */
+      .replace(/\/\/.*$/gm, '') // Commentaires //
+      .replace(/digraph\s+\w+\s*{/gi, '') // Supprimer 'digraph nom {'
+      .replace(/graph\s+\w+\s*{/gi, '') // Supprimer 'graph nom {'
+      .replace(/}/g, '') // Supprimer les accolades fermantes
+      .replace(/;/g, '') // Supprimer les points-virgules
+      .replace(/\s+/g, ' ') // Normaliser les espaces
+      .trim();
     
-    uniqueNodes.forEach((nodeId, index) => {
-      // Chercher les attributs du nœud
-      const labelMatch = dotContent.match(new RegExp(`${nodeId}\\s*\\[([^\\]]+)\\]`));
-      let label = nodeId;
-      let color = '#4FC3F7';
-      let shape = 'circle';
+    console.log('Contenu DOT nettoyé:', cleanContent);
+    
+    // Mots-clés DOT à exclure complètement
+    const dotKeywords = new Set([
+      'digraph', 'graph', 'subgraph', 'node', 'edge', 'strict',
+      'cluster', 'rank', 'rankdir', 'label', 'style', 'color',
+      'shape', 'size', 'width', 'height', 'fontname', 'fontsize',
+      'bgcolor', 'margin', 'pad', 'nodesep', 'ranksep', 'splines',
+      'overlap', 'concentrate', 'compound', 'lhead', 'ltail'
+    ]);
+    
+    // 1. D'abord extraire TOUTES les arêtes pour identifier les nœuds connectés
+    const edgeRegex = /([A-Za-z]\w*)\s*->\s*([A-Za-z]\w*)(?:\s*\[([^\]]*)\])?/g;
+    const connectedNodes = new Set<string>();
+    let edgeMatch;
+    
+    // Reset regex
+    edgeRegex.lastIndex = 0;
+    while ((edgeMatch = edgeRegex.exec(cleanContent)) !== null) {
+      const sourceId = edgeMatch[1];
+      const targetId = edgeMatch[2];
+      const attrsString = edgeMatch[3] || '';
       
-      if (labelMatch) {
-        const attributes = labelMatch[1];
-        const labelAttr = attributes.match(/label\s*=\s*"([^"]+)"/);
-        const colorAttr = attributes.match(/(?:fillcolor|color)\s*=\s*"?([^",\s]+)"?/);
-        const shapeAttr = attributes.match(/shape\s*=\s*"?([^",\s]+)"?/);
-        
-        if (labelAttr) label = labelAttr[1];
-        if (colorAttr) color = colorAttr[1];
-        if (shapeAttr) shape = shapeAttr[1];
+      // Ignorer si c'est un mot-clé DOT
+      if (dotKeywords.has(sourceId.toLowerCase()) || dotKeywords.has(targetId.toLowerCase())) {
+        continue;
       }
       
-      nodes.push({
-        id: nodeId,
-        label,
-        color,
-        shape,
-        size: 1
-      });
-    });
-    
-    // Extraire les arêtes (A -> B, A -- B)
-    const edgeMatches = dotContent.match(/\b([A-Za-z][A-Za-z0-9_]*)\s*(?:->|--)\s*([A-Za-z][A-Za-z0-9_]*)/g);
-    
-    if (edgeMatches) {
-      edgeMatches.forEach((edge, index) => {
-        const match = edge.match(/\b([A-Za-z][A-Za-z0-9_]*)\s*(?:->|--)\s*([A-Za-z][A-Za-z0-9_]*)/);
-        if (match) {
-          edges.push({
-            id: `edge_${index}`,
-            source: match[1],
-            target: match[2],
-            color: '#90A4AE'
-          });
-        }
-      });
-    }
-    
-    return { nodes, edges };
-  }
-  
-  static convertTo3D(graphData: GraphData): { nodes: Node3D[], edges: Edge3D[] } {
-    const nodes3D: Node3D[] = [];
-    const edges3D: Edge3D[] = [];
-    
-    // Disposer les nœuds en cercle ou grille selon le nombre
-    const nodeCount = graphData.nodes.length;
-    const radius = Math.max(3, nodeCount * 0.5);
-    
-    graphData.nodes.forEach((node, index) => {
-      let position: Vector3;
+      connectedNodes.add(sourceId);
+      connectedNodes.add(targetId);
       
-      if (nodeCount <= 8) {
-        // Disposition en cercle pour petits graphiques
-        const angle = (index / nodeCount) * Math.PI * 2;
-        position = new Vector3(
-          Math.cos(angle) * radius,
-          Math.sin(angle) * radius,
-          0
-        );
-      } else {
-        // Disposition en grille 3D pour graphiques plus larges
-        const gridSize = Math.ceil(Math.cbrt(nodeCount));
-        const x = (index % gridSize) - gridSize / 2;
-        const y = Math.floor(index / gridSize) % gridSize - gridSize / 2;
-        const z = Math.floor(index / (gridSize * gridSize)) - gridSize / 2;
-        position = new Vector3(x * 2, y * 2, z * 2);
-      }
-      
-      nodes3D.push({
-        id: node.id,
-        position,
-        label: node.label || node.id,
-        color: node.color || '#4FC3F7',
-        size: node.size || 1
-      });
-    });
-    
-    // Créer les arêtes entre les nœuds
-    graphData.edges.forEach((edge) => {
-      const sourceNode = nodes3D.find(n => n.id === edge.source);
-      const targetNode = nodes3D.find(n => n.id === edge.target);
-      
-      if (sourceNode && targetNode) {
-        edges3D.push({
-          id: edge.id,
-          source: sourceNode,
-          target: targetNode,
-          color: edge.color || '#90A4AE',
-          points: [sourceNode.position, targetNode.position]
+      // Créer les nœuds s'ils n'existent pas
+      if (!nodeMap.has(sourceId)) {
+        nodeMap.set(sourceId, {
+          id: sourceId,
+          name: sourceId,
+          group: nodeMap.size % 5 + 1,
+          val: 8,
+          color: `hsl(${(nodeMap.size * 60) % 360}, 70%, 50%)`
         });
       }
-    });
+      
+      if (!nodeMap.has(targetId)) {
+        nodeMap.set(targetId, {
+          id: targetId,
+          name: targetId,
+          group: nodeMap.size % 5 + 1,
+          val: 8,
+          color: `hsl(${(nodeMap.size * 60) % 360}, 70%, 50%)`
+        });
+      }
+      
+      // Parser les attributs de l'arête
+      const attrs = this.parseAttributes(attrsString);
+      
+      links.push({
+        source: sourceId,
+        target: targetId,
+        value: parseFloat(attrs.weight || '1'),
+        color: attrs.color || '#999999',
+        name: attrs.name || attrs.label || `${sourceId} → ${targetId}`
+      });
+    }
     
-    return { nodes: nodes3D, edges: edges3D };
+    // 2. Ensuite traiter les définitions de nœuds avec attributs
+    const nodeWithAttrsRegex = /([A-Za-z]\w*)\s*\[([^\]]*)\]/g;
+    let nodeMatch;
+    
+    nodeWithAttrsRegex.lastIndex = 0;
+    while ((nodeMatch = nodeWithAttrsRegex.exec(cleanContent)) !== null) {
+      const nodeId = nodeMatch[1];
+      const attrsString = nodeMatch[2];
+      
+      // Ignorer si c'est un mot-clé DOT
+      if (dotKeywords.has(nodeId.toLowerCase())) {
+        continue;
+      }
+      
+      // Parser les attributs
+      const attrs = this.parseAttributes(attrsString);
+      
+      // Mettre à jour le nœud existant ou en créer un nouveau
+      const existingNode = nodeMap.get(nodeId);
+      const node: ForceGraphNode = {
+        id: nodeId,
+        name: attrs.name || attrs.label || nodeId,
+        group: existingNode?.group || (nodeMap.size % 5 + 1),
+        val: parseFloat(attrs.size || '8'),
+        color: attrs.color || existingNode?.color || `hsl(${(nodeMap.size * 60) % 360}, 70%, 50%)`
+      };
+      
+      nodeMap.set(nodeId, node);
+      connectedNodes.add(nodeId);
+    }
+    
+    console.log('Nœuds traités:', Array.from(nodeMap.keys()));
+    console.log('Liens créés:', links.length);
+    
+    // Convertir la Map en tableau
+    nodes.push(...Array.from(nodeMap.values()));
+    
+    return { nodes, links };
+  }
+  
+  private static parseAttributes(attrsString: string): Record<string, string> {
+    const attrs: Record<string, string> = {};
+    if (!attrsString) return attrs;
+    
+    // Parser les attributs du format: key="value", key=value, key="value with spaces"
+    const attrRegex = /([A-Za-z][A-Za-z0-9_]*)\s*=\s*(?:"([^"]*)"|([^,\s]+))/g;
+    let match;
+    
+    while ((match = attrRegex.exec(attrsString)) !== null) {
+      const key = match[1];
+      const value = match[2] || match[3]; // Valeur avec ou sans guillemets
+      attrs[key] = value;
+    }
+    
+    return attrs;
   }
 }
-
-// =====================================
-// Componants 3D
-// =====================================
-const Node3DComponent: React.FC<{ node: Node3D; onClick?: () => void }> = ({ node, onClick }) => {
-  const meshRef = useRef<any>(null);
-  const [hovered, setHovered] = useState(false);
-  
-  useFrame(() => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += 0.01;
-      const scale = hovered ? 1.2 : 1.0;
-      meshRef.current.scale.set(scale, scale, scale);
-    }
-  });
-  
-  return (
-    <group position={node.position}>
-      <Sphere
-        ref={meshRef}
-        args={[node.size * 0.3]}
-        onClick={onClick}
-        onPointerOver={() => setHovered(true)}
-        onPointerOut={() => setHovered(false)}
-      >
-        <meshStandardMaterial color={node.color} />
-      </Sphere>
-      <Text
-        position={[0, node.size * 0.8, 0]}
-        fontSize={0.3}
-        color="white"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {node.label}
-      </Text>
-    </group>
-  );
-};
-
-const Edge3DComponent: React.FC<{ edge: Edge3D }> = ({ edge }) => {
-  return (
-    <Line
-      points={edge.points}
-      color={edge.color}
-      lineWidth={2}
-    />
-  );
-};
-
-const GraphScene: React.FC<{ nodes: Node3D[], edges: Edge3D[] }> = ({ nodes, edges }) => {
-  const { camera } = useThree();
-  
-  useEffect(() => {
-    // Ajuster la caméra selon la taille du graphique
-    if (nodes.length > 0) {
-      const maxDistance = Math.max(...nodes.map(n => n.position.length()));
-      camera.position.set(maxDistance * 1.5, maxDistance * 1.5, maxDistance * 1.5);
-    }
-  }, [nodes, camera]);
-  
-  return (
-    <>
-      {/* Éclairage */}
-      <ambientLight intensity={0.6} />
-      <pointLight position={[10, 10, 10]} intensity={1} />
-      <pointLight position={[-10, -10, -10]} intensity={0.5} />
-      
-      {/* Nœuds */}
-      {nodes.map((node) => (
-        <Node3DComponent 
-          key={node.id} 
-          node={node}
-          onClick={() => console.log('Node clicked:', node.id)}
-        />
-      ))}
-      
-      {/* Arêtes */}
-      {edges.map((edge) => (
-        <Edge3DComponent key={edge.id} edge={edge} />
-      ))}
-      
-      {/* Contrôles de caméra */}
-      <OrbitControls
-        enablePan={true}
-        enableZoom={true}
-        enableRotate={true}
-        autoRotate={false}
-        maxDistance={50}
-        minDistance={2}
-      />
-    </>
-  );
-};
 
 // =====================================
 // Composant Principal
@@ -252,131 +183,462 @@ const GraphScene: React.FC<{ nodes: Node3D[], edges: Edge3D[] }> = ({ nodes, edg
 const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   dotContent,
   isValid,
-  parsedData,
-  width = 800,
-  height = 600
+  parsedData
 }) => {
+  const graphRef = useRef<HTMLDivElement>(null);
+  const forceGraphRef = useRef<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [renderStats, setRenderStats] = useState({
+    nodes: 0,
+    links: 0,
+    fps: 0
+  });
   
-  // Convertir le DOT en données 3D
-  const { nodes3D, edges3D } = useMemo(() => {
+
+  // État pour les contrôles de rendu
+  const [showArrows, setShowArrows] = useState(true);
+  const [showParticles, setShowParticles] = useState(false);
+  const [showNodeText, setShowNodeText] = useState(false);
+  const [showLinkText, setShowLinkText] = useState(false);
+  const [emitParticles, setEmitParticles] = useState(false);
+  
+  // État pour stocker les données du graphique
+  const [currentGraphData, setCurrentGraphData] = useState<{nodes: ForceGraphNode[], links: ForceGraphLink[]}>({nodes: [], links: []});
+  
+  // Effet pour détecter les dimensions du conteneur
+  useLayoutEffect(() => {
+    const updateDimensions = () => {
+      if (graphRef.current) {
+        const rect = graphRef.current.getBoundingClientRect();
+        setDimensions({
+          width: rect.width || 800,
+          height: rect.height || 600
+        });
+      }
+    };
+    
+    updateDimensions();
+    
+    const resizeObserver = new ResizeObserver(updateDimensions);
+    if (graphRef.current) {
+      resizeObserver.observe(graphRef.current);
+    }
+    
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Initialisation du graphique 3D
+  const initializeGraph = useCallback(() => {
+    if (!graphRef.current || !isValid) return;
+
     try {
       setLoading(true);
       setError(null);
+
+      // Parser le contenu DOT
+      const graphData = DotTo3DConverter.parseDotToGraphData(dotContent);
       
-      // Utiliser les données parsées si disponibles, sinon parser le DOT
-      const graphData = parsedData || DotTo3DConverter.parseDotToGraphData(dotContent);
-      const result = DotTo3DConverter.convertTo3D(graphData);
+      if (graphData.nodes.length === 0) {
+        setError('Aucun nœud détecté dans le graphique DOT');
+        return;
+      }
       
-      setLoading(false);
-      return { nodes3D: result.nodes, edges3D: result.edges };
+      // Sauvegarder les données du graphique pour les overlays
+      setCurrentGraphData(graphData);
+      
+      // Créer ou réinitialiser le graphique 3D
+      if (forceGraphRef.current) {
+        forceGraphRef.current._destructor();
+      }
+
+      // Créer l'instance ForceGraph3D avec le container DOM
+      const graph = ForceGraph3D()(graphRef.current!)
+        .width(dimensions.width)
+        .height(dimensions.height)
+        .backgroundColor('#0a0a0a')
+        .graphData(graphData);
+      
+      // Sauvegarder la référence pour le nettoyage
+      forceGraphRef.current = graph;
+
+      // Configuration des nœuds avec texte
+      graph
+        .nodeLabel('name')
+        .nodeVal('val')
+        .nodeColor('color');
+        
+
+
+      // Configuration des liens avec flèches et particules
+      graph
+        .linkLabel('name')
+        .linkColor('color')
+        .linkWidth(2)
+        .linkDirectionalArrowLength(showArrows ? 4 : 0)
+        .linkDirectionalArrowRelPos(1)
+        .linkDirectionalArrowColor('#ff6b6b');
+        
+      // Tooltips simples (le texte permanent est géré par Canvas)
+      graph.nodeLabel((node: any) => node.name || node.id || '')
+           .linkLabel((link: any) => link.name || link.id || '')
+           .nodeAutoColorBy('group');
+
+      // Particules pour les liens
+      if (showParticles) {
+        graph.linkDirectionalParticles(4)
+          .linkDirectionalParticleSpeed(0.01)
+          .linkDirectionalParticleWidth(2)
+          .linkDirectionalParticleColor('#4fc3f7');
+      }
+
+      // Émission de particules depuis les nœuds (simplifiée)
+      if (emitParticles) {
+        graph.d3Force('charge')?.strength(-200);
+        // L'émission de particules sera implémentée plus tard
+        console.log('Mode émission de particules activé');
+      }
+
+      // Événements d'interaction
+      graph
+        .onNodeClick((node: any) => {
+          console.log('Node clicked:', node);
+          // Animation de zoom vers le nœud
+          const distance = 40;
+          const distRatio = 1 + distance / Math.hypot(node.x, node.y, node.z);
+          graph.cameraPosition(
+            { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
+            node,
+            3000
+          );
+        })
+        .onNodeHover((node: any) => {
+          document.body.style.cursor = node ? 'pointer' : 'default';
+        })
+        .onLinkHover((link: any) => {
+          if (link && showLinkText) {
+            graph.linkLabel(() => link.name || '');
+          }
+        });
+
+      // Configuration des forces physiques
+      const linkForce = graph.d3Force('link');
+      if (linkForce) {
+        linkForce.distance(30);
+      }
+      
+      const chargeForce = graph.d3Force('charge');
+      if (chargeForce) {
+        chargeForce.strength(-120);
+      }
+      
+      const centerForce = graph.d3Force('center');
+      if (centerForce) {
+        centerForce.strength(0.1);
+      }
+
+      forceGraphRef.current = graph;
+
+      // Stats de rendu
+      const updateStats = () => {
+        setRenderStats({
+          nodes: graphData.nodes.length,
+          links: graphData.links.length,
+          fps: Math.round(graph.renderer().info.render.frame / 60)
+        });
+      };
+      
+      graph.onEngineStop(updateStats);
+      updateStats();
+
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du rendu 3D');
+      console.error('Erreur lors de l\'initialisation du graphique 3D:', err);
+      setError('Erreur lors du rendu 3D: ' + (err as Error).message);
+    } finally {
       setLoading(false);
-      return { nodes3D: [], edges3D: [] };
     }
-  }, [dotContent, parsedData]);
+  }, [dotContent, isValid, dimensions.width, dimensions.height, showArrows, showParticles, emitParticles]);
+
+  // État pour les overlays de texte
+  const [textOverlays, setTextOverlays] = useState<Array<{id: string, x: number, y: number, text: string, type: 'node' | 'link'}>>([]);
   
-  // Rendu conditionnel
+  // Fonction pour mettre à jour les positions des overlays
+  const updateTextOverlays = useCallback(() => {
+    if (!forceGraphRef.current || !currentGraphData.nodes.length) return;
+    
+    const overlays: Array<{id: string, x: number, y: number, text: string, type: 'node' | 'link'}> = [];
+    
+    // Overlays pour les nœuds
+    if (showNodeText) {
+      currentGraphData.nodes.forEach((node: ForceGraphNode) => {
+        const label = node.name || node.id || '';
+        if (label && node.x !== undefined && node.y !== undefined) {
+          // Projection 3D vers 2D (approximation)
+          const screenPos = forceGraphRef.current!.graph2ScreenCoords ? 
+            forceGraphRef.current!.graph2ScreenCoords(node.x, node.y, node.z || 0) :
+            { x: node.x * 10 + dimensions.width/2, y: -node.y * 10 + dimensions.height/2 };
+          
+          overlays.push({
+            id: `node-${node.id}`,
+            x: screenPos.x,
+            y: screenPos.y - 20, // Au-dessus du nœud
+            text: label,
+            type: 'node'
+          });
+        }
+      });
+    }
+    
+    // Overlays pour les liens
+    if (showLinkText) {
+      currentGraphData.links.forEach((link: ForceGraphLink, index: number) => {
+        const label = (link as any).name || (link as any).id || `Link ${index + 1}`;
+        if (label && link.source && link.target) {
+          const source = typeof link.source === 'object' ? link.source : currentGraphData.nodes.find((n: ForceGraphNode) => n.id === link.source);
+          const target = typeof link.target === 'object' ? link.target : currentGraphData.nodes.find((n: ForceGraphNode) => n.id === link.target);
+          
+          if (source && target && source.x !== undefined && target.x !== undefined && source.y !== undefined && target.y !== undefined) {
+            const midX = (source.x + target.x) / 2;
+            const midY = (source.y + target.y) / 2;
+            const midZ = ((source.z || 0) + (target.z || 0)) / 2;
+            
+            const screenPos = forceGraphRef.current!.graph2ScreenCoords ? 
+              forceGraphRef.current!.graph2ScreenCoords(midX, midY, midZ) :
+              { x: midX * 10 + dimensions.width/2, y: -midY * 10 + dimensions.height/2 };
+            
+            overlays.push({
+              id: `link-${index}`,
+              x: screenPos.x,
+              y: screenPos.y,
+              text: label,
+              type: 'link'
+            });
+          }
+        }
+      });
+    }
+    
+    setTextOverlays(overlays);
+  }, [currentGraphData, showNodeText, showLinkText, dimensions.width, dimensions.height]);
+  
+  // Mise à jour des overlays quand le graphique bouge
+  useEffect(() => {
+    if (!forceGraphRef.current) return;
+    
+    const graph = forceGraphRef.current;
+    let animationFrame: number;
+    
+    const updateLoop = () => {
+      updateTextOverlays();
+      animationFrame = requestAnimationFrame(updateLoop);
+    };
+    
+    if (showNodeText || showLinkText) {
+      updateLoop();
+    }
+    
+    return () => {
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
+    };
+  }, [updateTextOverlays, showNodeText, showLinkText]);
+
+  // Effet pour initialiser/réinitialiser le graphique
+  useEffect(() => {
+    if (isValid && dotContent) {
+      initializeGraph();
+    }
+    
+    return () => {
+      if (forceGraphRef.current) {
+        forceGraphRef.current._destructor();
+      }
+    };
+  }, [initializeGraph, isValid, dotContent]);
+
+  // Interface de rendu
   if (!isValid) {
     return (
-      <Box sx={{ 
-        height,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(45deg, rgba(244,67,54,0.1), rgba(255,87,34,0.1))'
-      }}>
-        <Alert severity="error">
-          <Typography variant="h6">Code DOT invalide</Typography>
-          <Typography variant="body2">
-            Corrigez les erreurs de syntaxe pour voir l'aperçu 3D
-          </Typography>
-        </Alert>
-      </Box>
+      <Alert severity="error" sx={{ m: 2 }}>
+        <Typography variant="h6">Code DOT invalide</Typography>
+        <Typography>Corrigez les erreurs de syntaxe pour voir l'aperçu 3D</Typography>
+      </Alert>
     );
   }
-  
-  if (loading) {
-    return (
-      <Box sx={{ 
-        height,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'column',
-        gap: 2
-      }}>
-        <CircularProgress />
-        <Typography>Génération du rendu 3D...</Typography>
-      </Box>
-    );
-  }
-  
-  if (error) {
-    return (
-      <Box sx={{ 
-        height,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <Alert severity="error">
-          <Typography variant="h6">Erreur de rendu</Typography>
-          <Typography variant="body2">{error}</Typography>
-        </Alert>
-      </Box>
-    );
-  }
-  
-  if (nodes3D.length === 0) {
-    return (
-      <Box sx={{ 
-        height,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(45deg, rgba(33,150,243,0.1), rgba(156,39,176,0.1))'
-      }}>
-        <Typography variant="h6" color="text.secondary">
-          Aucun nœud détecté dans le code DOT
-        </Typography>
-      </Box>
-    );
-  }
-  
+
   return (
-    <Box sx={{ width, height, position: 'relative' }}>
-      <Canvas
-        camera={{ position: [5, 5, 5], fov: 75 }}
-        style={{ 
-          background: 'linear-gradient(45deg, rgba(13,25,43,0.9), rgba(27,39,51,0.9))'
+    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+      {/* Panneau de contrôles */}
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          position: 'absolute', 
+          top: 10, 
+          left: 10, 
+          zIndex: 10, 
+          p: 2,
+          backgroundColor: 'rgba(255, 255, 255, 0.9)'
         }}
       >
-        <GraphScene nodes={nodes3D} edges={edges3D} />
-      </Canvas>
+        <Typography variant="h6" gutterBottom>Contrôles 3D</Typography>
+        
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Button 
+            variant={showArrows ? 'contained' : 'outlined'}
+            size="small"
+            onClick={() => setShowArrows(!showArrows)}
+          >
+            🏹 Flèches directionnelles
+          </Button>
+          
+          <Button 
+            variant={showParticles ? 'contained' : 'outlined'}
+            size="small"
+            onClick={() => setShowParticles(!showParticles)}
+          >
+            ✨ Particules sur liens
+          </Button>
+          
+          <Button 
+            variant={showNodeText ? 'contained' : 'outlined'}
+            size="small"
+            onClick={() => setShowNodeText(!showNodeText)}
+          >
+            🏷️ Texte des nœuds
+          </Button>
+          
+          <Button 
+            variant={showLinkText ? 'contained' : 'outlined'}
+            size="small"
+            onClick={() => setShowLinkText(!showLinkText)}
+          >
+            📝 Texte des liens
+          </Button>
+          
+          <Button 
+            variant={emitParticles ? 'contained' : 'outlined'}
+            size="small"
+            onClick={() => setEmitParticles(!emitParticles)}
+          >
+            🎆 Émission particules
+          </Button>
+        </Box>
+
+        {/* Statistiques */}
+        {renderStats.nodes > 0 && (
+          <Card sx={{ mt: 2, backgroundColor: 'rgba(0, 0, 0, 0.05)' }}>
+            <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+              <Typography variant="caption" display="block">
+                📊 Nœuds: {renderStats.nodes}
+              </Typography>
+              <Typography variant="caption" display="block">
+                🔗 Liens: {renderStats.links}
+              </Typography>
+              <Typography variant="caption" display="block">
+                ⚡ FPS: {renderStats.fps || 'N/A'}
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
+      </Paper>
+
+      {/* Zone de rendu 3D */}
+      <Box
+        ref={graphRef}
+        sx={{
+          width: '100%',
+          height: '100%',
+          borderRadius: 1,
+          overflow: 'hidden',
+          cursor: 'grab',
+          '&:active': { cursor: 'grabbing' }
+        }}
+      />
       
-      {/* Indicateur de nœuds/arêtes */}
-      <Box sx={{ 
-        position: 'absolute',
-        top: 16,
-        right: 16,
-        background: 'rgba(0,0,0,0.7)',
-        color: 'white',
-        px: 2,
-        py: 1,
-        borderRadius: 1,
-        display: 'flex',
-        gap: 2
-      }}>
-        <Typography variant="caption">
-          {nodes3D.length} nœuds
+      {/* Overlays de texte permanent */}
+      {textOverlays.map((overlay) => (
+        <Typography
+          key={overlay.id}
+          sx={{
+            position: 'absolute',
+            left: `${overlay.x}px`,
+            top: `${overlay.y}px`,
+            color: overlay.type === 'node' ? '#ffffff' : '#cccccc',
+            fontSize: overlay.type === 'node' ? '12px' : '10px',
+            fontFamily: 'Arial, sans-serif',
+            fontWeight: 'bold',
+            textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            zIndex: 50,
+            transform: 'translate(-50%, -50%)'
+          }}
+        >
+          {overlay.text}
         </Typography>
-        <Typography variant="caption">
-          {edges3D.length} arêtes
-        </Typography>
-      </Box>
+      ))}
+
+      {/* Indicateur de chargement */}
+      {loading && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            color: 'white',
+            zIndex: 100
+          }}
+        >
+          <Box sx={{ textAlign: 'center' }}>
+            <CircularProgress color="primary" sx={{ mb: 2 }} />
+            <Typography>Génération du rendu 3D...</Typography>
+          </Box>
+        </Box>
+      )}
+
+      {/* Affichage d'erreur */}
+      {error && (
+        <Alert 
+          severity="error" 
+          sx={{ 
+            position: 'absolute', 
+            bottom: 10, 
+            left: 10, 
+            right: 10,
+            zIndex: 10 
+          }}
+        >
+          {error}
+        </Alert>
+      )}
+
+      {/* Aide contextuelle */}
+      <Tooltip 
+        title="🖱️ Clic gauche: rotation • Molette: zoom • Clic droit: pan • Clic sur nœud: focus"
+        placement="top"
+      >
+        <Paper 
+          sx={{ 
+            position: 'absolute', 
+            bottom: 10, 
+            right: 10, 
+            p: 1,
+            backgroundColor: 'rgba(255, 255, 255, 0.9)'
+          }}
+        >
+          <Typography variant="caption">💡 Aide</Typography>
+        </Paper>
+      </Tooltip>
     </Box>
   );
 };

@@ -165,33 +165,111 @@ class DotValidator {
       return result;
     }
 
-    // Parse nodes
-    const nodePattern = /(\w+)\s*(\[([^\]]*)\])?/g;
-    let nodeMatch;
-    while ((nodeMatch = nodePattern.exec(dotCode)) !== null) {
-      if (!nodeMatch[0].includes('->') && !nodeMatch[0].includes('--')) {
-        result.ast.nodes.push({
-          id: nodeMatch[1],
-          attributes: this.parseAttributes(nodeMatch[3] || '')
-        });
-        result.metadata.nodeCount++;
-      }
-    }
+    // ===== ROBUST DOT PARSER V2 =====
+    // Liste étendue des mots-clés DOT à exclure
+    const dotKeywords = new Set([
+      'digraph', 'graph', 'subgraph', 'node', 'edge', 'strict',
+      'cluster', 'rank', 'rankdir', 'label', 'style', 'color',
+      'shape', 'size', 'width', 'height', 'fontname', 'fontsize',
+      'bgcolor', 'margin', 'pad', 'nodesep', 'ranksep', 'splines',
+      'overlap', 'concentrate', 'compound', 'lhead', 'ltail',
+      'exemple', 'example' // Mots d'exemple courants
+    ]);
 
-    // Parse edges
+    // Nettoyer le contenu DOT
+    const cleanContent = dotCode
+      .replace(/\/\*[\s\S]*?\*\//g, '') // Supprimer commentaires /* */
+      .replace(/\/\/.*$/gm, '') // Supprimer commentaires //
+      .replace(/^\s*(strict\s+)?(di)?graph\s+\w*\s*\{/i, '') // Supprimer déclaration graph
+      .replace(/\}\s*$/g, '') // Supprimer accolade fermante
+      .replace(/;/g, '') // Supprimer points-virgules
+      .replace(/\s+/g, ' ') // Normaliser espaces
+      .trim();
+
+    console.log('[BACKEND] Contenu DOT nettoyé:', cleanContent);
+
+    // Map pour éviter les doublons de nœuds
+    const nodeMap = new Map();
+    const connectedNodeIds = new Set();
+
+    // ÉTAPE 1: Parser les arêtes UNIQUEMENT pour identifier les nœuds connectés
     const edgePattern = result.metadata.type === 'digraph' 
-      ? /(\w+)\s*->\s*(\w+)(\s*\[([^\]]*)\])?/g
-      : /(\w+)\s*--\s*(\w+)(\s*\[([^\]]*)\])?/g;
+      ? /([A-Za-z]\w*)\s*->\s*([A-Za-z]\w*)(?:\s*\[([^\]]*)\])?/g
+      : /([A-Za-z]\w*)\s*--\s*([A-Za-z]\w*)(?:\s*\[([^\]]*)\])?/g;
     
     let edgeMatch;
-    while ((edgeMatch = edgePattern.exec(dotCode)) !== null) {
+    edgePattern.lastIndex = 0; // Reset regex
+    
+    while ((edgeMatch = edgePattern.exec(cleanContent)) !== null) {
+      const fromId = edgeMatch[1];
+      const toId = edgeMatch[2];
+      
+      // Filtrer les mots-clés DOT
+      if (dotKeywords.has(fromId.toLowerCase()) || dotKeywords.has(toId.toLowerCase())) {
+        continue;
+      }
+      
+      // Marquer comme connectés
+      connectedNodeIds.add(fromId);
+      connectedNodeIds.add(toId);
+      
+      // Créer les nœuds s'ils n'existent pas
+      if (!nodeMap.has(fromId)) {
+        nodeMap.set(fromId, {
+          id: fromId,
+          attributes: {}
+        });
+      }
+      if (!nodeMap.has(toId)) {
+        nodeMap.set(toId, {
+          id: toId,
+          attributes: {}
+        });
+      }
+      
+      // Ajouter l'arête
       result.ast.edges.push({
-        from: edgeMatch[1],
-        to: edgeMatch[2],
-        attributes: this.parseAttributes(edgeMatch[4] || '')
+        from: fromId,
+        to: toId,
+        attributes: this.parseAttributes(edgeMatch[3] || '')
       });
       result.metadata.edgeCount++;
     }
+
+    // ÉTAPE 2: Parser les attributs des nœuds et enrichir les nœuds existants
+    const nodeWithAttrsRegex = /([A-Za-z]\w*)\s*\[([^\]]*)\]/g;
+    let nodeAttrMatch;
+    nodeWithAttrsRegex.lastIndex = 0; // Reset regex
+    
+    while ((nodeAttrMatch = nodeWithAttrsRegex.exec(cleanContent)) !== null) {
+      const nodeId = nodeAttrMatch[1];
+      const attrsString = nodeAttrMatch[2];
+      
+      // Filtrer les mots-clés DOT
+      if (dotKeywords.has(nodeId.toLowerCase())) {
+        continue;
+      }
+      
+      // Mettre à jour ou créer le nœud
+      if (nodeMap.has(nodeId)) {
+        // Enrichir nœud existant
+        const existingNode = nodeMap.get(nodeId);
+        existingNode.attributes = { ...existingNode.attributes, ...this.parseAttributes(attrsString) };
+      } else if (connectedNodeIds.has(nodeId)) {
+        // Créer nœud seulement s'il est connecté
+        nodeMap.set(nodeId, {
+          id: nodeId,
+          attributes: this.parseAttributes(attrsString)
+        });
+      }
+    }
+
+    // Convertir la Map en array pour result.ast.nodes
+    result.ast.nodes = Array.from(nodeMap.values());
+    result.metadata.nodeCount = result.ast.nodes.length;
+
+    console.log('[BACKEND] Nœuds traités:', Array.from(nodeMap.keys()));
+    console.log('[BACKEND] Liens créés:', result.metadata.edgeCount);
 
     // Parse subgraphs
     const subgraphPattern = /subgraph\s+(\w+)?\s*\{([^}]*)\}/g;
@@ -282,14 +360,7 @@ class DotValidator {
       }
     }
 
-    // Check for duplicate node definitions
-    const seenNodes = new Set();
-    for (const node of ast.nodes) {
-      if (seenNodes.has(node.id)) {
-        result.warnings.push(`Duplicate node definition: "${node.id}"`);
-      }
-      seenNodes.add(node.id);
-    }
+    // Note: Duplicate node definitions are now prevented by the robust parser V2
 
     // Validate node attributes
     for (const node of ast.nodes) {
@@ -307,17 +378,7 @@ class DotValidator {
       }
     }
 
-    // Check for isolated nodes
-    const connectedNodes = new Set();
-    for (const edge of ast.edges) {
-      connectedNodes.add(edge.from);
-      connectedNodes.add(edge.to);
-    }
-    for (const node of ast.nodes) {
-      if (!connectedNodes.has(node.id)) {
-        result.warnings.push(`Isolated node (no connections): "${node.id}"`);
-      }
-    }
+    // Note: Isolated nodes are now filtered out by the robust parser V2
 
     return result;
   }
