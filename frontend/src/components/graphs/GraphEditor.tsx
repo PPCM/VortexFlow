@@ -36,6 +36,8 @@ import {
   CheckCircle,
   Error,
   Warning,
+  FiberNew,
+  Edit,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import DOTCodeMirrorEditor from './DOTCodeMirrorEditor';
@@ -107,6 +109,8 @@ digraph example {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [autoSave, setAutoSave] = useState(false);
   const [realTimePreview, setRealTimePreview] = useState(true);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleHover, setTitleHover] = useState(false);
 
   const isNewGraph = id === 'new';
   const currentGraph = state.currentGraph;
@@ -253,6 +257,27 @@ digraph example {
     }
   };
 
+  // Fonctions de gestion de l'édition du titre
+  const handleTitleClick = () => {
+    setIsEditingTitle(true);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      setIsEditingTitle(false);
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const handleTitleBlur = () => {
+    setIsEditingTitle(false);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setGraphName(e.target.value);
+  };
+
   // =====================================
   // Rendu conditionnel
   // =====================================
@@ -312,9 +337,48 @@ digraph example {
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* En-tête */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          {isNewGraph ? 'Nouveau Graphique' : `Éditer: ${graphName}`}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {isNewGraph && (
+            <FiberNew sx={{ color: 'success.main', fontSize: '1.5rem' }} />
+          )}
+          {isEditingTitle ? (
+            <TextField
+              value={graphName}
+              onChange={handleTitleChange}
+              onKeyDown={handleTitleKeyDown}
+              onBlur={handleTitleBlur}
+              autoFocus
+              variant="standard"
+              sx={{
+                '& .MuiInput-input': {
+                  fontSize: '2rem',
+                  fontWeight: 600,
+                  p: 0
+                }
+              }}
+            />
+          ) : (
+            <Typography 
+              variant="h5" 
+              sx={{ 
+                fontWeight: 600,
+                cursor: 'pointer',
+                p: 1,
+                borderRadius: 1,
+                backgroundColor: titleHover ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
+                transition: 'background-color 0.2s',
+                '&:hover': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                }
+              }}
+              onClick={handleTitleClick}
+              onMouseEnter={() => setTitleHover(true)}
+              onMouseLeave={() => setTitleHover(false)}
+            >
+              {graphName || (isNewGraph ? 'Nouveau Graphique' : 'Sans titre')}
+            </Typography>
+          )}
+        </Box>
         
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Tooltip title="Valider DOT">
@@ -369,22 +433,6 @@ digraph example {
         {/* Panneau de gauche - Métadonnées */}
         <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 25%' } }}>
           <Paper sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom>
-              Propriétés
-            </Typography>
-            
-            <TextField
-              fullWidth
-              label="Nom du graphique"
-              value={graphName}
-              onChange={(e) => {
-                setGraphName(e.target.value);
-                setHasUnsavedChanges(true);
-              }}
-              margin="normal"
-              size="small"
-            />
-            
             <TextField
               fullWidth
               label="Description"
