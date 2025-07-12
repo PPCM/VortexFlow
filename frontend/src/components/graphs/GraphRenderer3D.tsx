@@ -12,7 +12,10 @@ import {
   Tooltip, 
   CircularProgress, 
   Alert,
-  Slider
+  Slider,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails
 } from '@mui/material';
 import { 
   Settings as SettingsIcon, 
@@ -25,7 +28,16 @@ import {
   ExpandMore as ExpandMoreIcon, 
   BarChart as StatsIcon, 
   Speed as SpeedIcon, 
-  AccountTree as NodesIcon 
+  AccountTree as NodesIcon,
+  OpenInFull as SpacingIcon,
+  RadioButtonUnchecked as NodeSizeIcon,
+  ArrowForward as ArrowForwardIcon,
+  BlurOn as BlurOnIcon,
+  TextFields as TextFieldsIcon,
+  FlashOn as FlashOnIcon,
+  Timeline as CurveIcon,
+  LineWeight as WidthIcon,
+  Tune as TuneIcon
 } from '@mui/icons-material';
 import ForceGraph3D from '3d-force-graph';
 import { GraphData, GraphNode, GraphEdge } from '../../types';
@@ -229,6 +241,16 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   const [emitParticles, setEmitParticles] = useState(false);
   const [linkCurvature, setLinkCurvature] = useState(0.2); // Intensité des courbes (0 = droite, 1 = très courbée)
   const [linkWidth, setLinkWidth] = useState(0); // Épaisseur des liens (0 = filet minimal, 8 = épais)
+  const [nodeSpacing, setNodeSpacing] = useState(30); // Espacement entre nœuds (10 = serré, 100 = espacé)
+  const [nodeSize, setNodeSize] = useState(4); // Taille des nœuds (1 = petit, 12 = gros)
+  
+  // États pour les accordéons
+  const [controlsExpanded, setControlsExpanded] = useState(false); // Accordéon "Contrôles Visuels" fermé par défaut
+  const [parametersExpanded, setParametersExpanded] = useState(false); // Accordéon "Paramètres Ajustables" fermé par défaut
+  
+  // États pour le redimensionnement du panneau
+  const [panelSize, setPanelSize] = useState({ width: 320, height: 650 });
+  const [isResizing, setIsResizing] = useState(false);
   
   // Génération d'un ID unique basé sur le contenu DOT pour la mémorisation
   const graphId = React.useMemo(() => {
@@ -299,31 +321,33 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     setIsInitialLoad(true);
   }, [graphId, loadSavedState]);
   
-  // Taille du panneau pour les contraintes
-  const PANEL_WIDTH = 260;
-  const PANEL_HEIGHT = isControlsMinimized ? 60 : 500;
+  // Type pour la position
+  interface Position {
+    x: number;
+    y: number;
+  }
   
   // État pour stocker les données du graphique
   const [currentGraphData, setCurrentGraphData] = useState<{nodes: ForceGraphNode[], links: ForceGraphLink[]}>({nodes: [], links: []});
   
-  // Fonction pour contraindre la position dans les limites
-  const constrainPosition = useCallback((x: number, y: number, skipIfValid = false) => {
-    const containerWidth = dimensions.width || 800;
-    const containerHeight = dimensions.height || 600;
+  // Fonction pour contraindre la position du panneau dans les limites
+  const constrainPosition = useCallback((x: number, y: number, allowPartiallyHidden = false): Position => {
+    const containerWidth = dimensions.width;
+    const containerHeight = dimensions.height;
+    const currentWidth = panelSize.width;
+    const currentHeight = isControlsMinimized ? 60 : panelSize.height;
     
-    // Si skipIfValid est true et la position est déjà valide, ne pas la changer
-    if (skipIfValid && x >= 0 && y >= 0 && 
-        x <= containerWidth - PANEL_WIDTH && y <= containerHeight - PANEL_HEIGHT) {
+    if (allowPartiallyHidden && 
+        x >= -currentWidth * 0.8 && y >= -currentHeight * 0.8 &&
+        x <= containerWidth - currentWidth && y <= containerHeight - currentHeight) {
       return { x, y };
     }
     
-    // Contraindre X (ne pas dépasser les bords)
-    let constrainedX = Math.max(0, Math.min(x, containerWidth - PANEL_WIDTH));
-    // Contraindre Y (ne pas dépasser les bords)
-    let constrainedY = Math.max(0, Math.min(y, containerHeight - PANEL_HEIGHT));
+    let constrainedX = Math.max(0, Math.min(x, containerWidth - currentWidth));
+    let constrainedY = Math.max(0, Math.min(y, containerHeight - currentHeight));
     
     return { x: constrainedX, y: constrainedY };
-  }, [dimensions.width, dimensions.height, PANEL_WIDTH, PANEL_HEIGHT]);
+  }, [dimensions.width, dimensions.height, panelSize.width, panelSize.height, isControlsMinimized]);
   
   // Gestion du drag & drop avec manipulation DOM directe (pas de React setState pendant le drag)
   useEffect(() => {
@@ -340,8 +364,10 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         const newY = e.clientY - dragOffset.y;
         
         // Application des contraintes
-        const constrainedX = Math.max(0, Math.min(newX, containerWidth - PANEL_WIDTH));
-        const constrainedY = Math.max(0, Math.min(newY, containerHeight - PANEL_HEIGHT));
+        const currentWidth = panelSize.width;
+        const currentHeight = isControlsMinimized ? 60 : panelSize.height;
+        const constrainedX = Math.max(0, Math.min(newX, containerWidth - currentWidth));
+        const constrainedY = Math.max(0, Math.min(newY, containerHeight - currentHeight));
         
         // Mise à jour DOM directe - ULTRA FLUIDE car pas de React
         controlsPanelRef.current.style.transform = `translate(${constrainedX}px, ${constrainedY}px)`;
@@ -373,7 +399,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       document.removeEventListener('mouseup', handleMouseUp);
       isDraggingRef.current = false;
     };
-  }, [isDragging, dragOffset, dimensions.width, dimensions.height, PANEL_WIDTH, PANEL_HEIGHT]);
+  }, [isDragging, dragOffset, dimensions.width, dimensions.height, panelSize.width, panelSize.height, isControlsMinimized]);
   
   // Effet pour synchroniser la position DOM initiale avec React state
   useEffect(() => {
@@ -382,6 +408,33 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       positionRef.current = controlsPosition;
     }
   }, [controlsPosition, isDragging]);
+  
+  // Gestion du redimensionnement
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = graphRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const newWidth = Math.max(280, Math.min(600, e.clientX - controlsPosition.x - rect.left));
+      const newHeight = Math.max(300, Math.min(800, e.clientY - controlsPosition.y - rect.top));
+      
+      setPanelSize({ width: newWidth, height: newHeight });
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, controlsPosition]);
   
   // Effet pour ajuster la position quand les dimensions changent (sauf au chargement initial et pendant le drag)
   useEffect(() => {
@@ -501,7 +554,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       // Configuration des nœuds avec texte
       graph
         .nodeLabel('name')
-        .nodeVal('val')
+        .nodeVal(nodeSize) // Taille contrôlée par le slider
         .nodeColor('color');
         
 
@@ -585,7 +638,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [dotContent, isValid, dimensions.width, dimensions.height]);
+  }, [dotContent, isValid, dimensions.width, dimensions.height, nodeSize]);
 
   // Effet pour redimensionner le graphique 3D quand les dimensions changent
   useEffect(() => {
@@ -615,6 +668,37 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       .linkDirectionalParticleWidth(2);
   }, [showParticles, emitParticles]);
 
+  // Fonction pour mettre à jour l'espacement des nœuds
+  const updateNodeSpacing = useCallback(() => {
+    if (!forceGraphRef.current) return;
+    
+    // Configuration des forces pour l'espacement
+    const graph = forceGraphRef.current;
+    if (graph.d3Force) {
+      // Force de liaison (distance entre nœuds connectés)
+      const linkForce = graph.d3Force('link');
+      if (linkForce) {
+        linkForce.distance(nodeSpacing);
+      }
+      
+      // Force de charge (répulsion entre tous les nœuds)
+      const chargeForce = graph.d3Force('charge');
+      if (chargeForce) {
+        chargeForce.strength(-nodeSpacing * 4); // Proportionnel à l'espacement
+      }
+      
+      // Redémarrer la simulation pour appliquer les nouvelles forces
+      graph.d3ReheatSimulation();
+    }
+  }, [nodeSpacing]);
+
+  // Fonction pour mettre à jour la taille des nœuds
+  const updateNodeSize = useCallback(() => {
+    if (!forceGraphRef.current) return;
+    
+    forceGraphRef.current.nodeVal(nodeSize);
+  }, [nodeSize]);
+
   // Effets pour mettre à jour les propriétés sans redessin
   useEffect(() => {
     updateLinkProperties();
@@ -623,6 +707,14 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   useEffect(() => {
     updateParticleProperties();
   }, [updateParticleProperties]);
+
+  useEffect(() => {
+    updateNodeSpacing();
+  }, [updateNodeSpacing]);
+
+  useEffect(() => {
+    updateNodeSize();
+  }, [updateNodeSize]);
 
   // État pour les overlays de texte
   const [textOverlays, setTextOverlays] = useState<Array<{id: string, x: number, y: number, text: string, type: 'node' | 'link'}>>([]);
@@ -751,15 +843,21 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           left: 0,
           // Position initiale uniquement, sera écrasée par manipulation DOM pendant drag
           transform: !isDragging ? `translate(${controlsPosition.x}px, ${controlsPosition.y}px)` : undefined,
-          width: `${PANEL_WIDTH}px`,
-          minHeight: `${PANEL_HEIGHT}px`,
-          maxHeight: `${PANEL_HEIGHT}px`,
+          width: `${panelSize.width}px`,
+          height: `${panelSize.height}px`,
+          minWidth: '280px',
+          minHeight: '300px',
+          maxWidth: '600px',
+          maxHeight: '800px',
           zIndex: 10, 
-          p: 2,
           backgroundColor: 'rgba(255, 255, 255, 0.9)',
-          cursor: isDragging ? 'grabbing' : 'grab',
+          cursor: isDragging ? 'grabbing' : (isResizing ? 'nw-resize' : 'grab'),
           userSelect: 'none',
-          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          border: '1px solid rgba(0, 0, 0, 0.2)',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
           // Pas de transition pendant le drag pour performance maximale
           transition: isDragging ? 'none' : 'background-color 0.2s ease',
           '&:hover': {
@@ -767,11 +865,16 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           }
         }}
       >
+        {/* En-tête du panneau - fixe */}
         <Box sx={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
-          alignItems: 'flex-start',
-          mb: isControlsMinimized ? 0 : 2
+          alignItems: 'center',
+          p: 2,
+          borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          borderRadius: '8px 8px 0 0',
+          minHeight: '60px'
         }}>
           <Box sx={{ cursor: 'inherit', display: 'flex', alignItems: 'center', gap: 1 }}>
             <SettingsIcon sx={{ color: 'primary.main', fontSize: '1.2rem' }} />
@@ -807,175 +910,230 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           </Button>
         </Box>
         
+        {/* Zone de contenu avec scroll */}
         {!isControlsMinimized && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.2 }}>
-          <Button 
-            variant={showArrows ? 'contained' : 'outlined'}
-            size="small"
-            startIcon={<ArrowIcon />}
-            onClick={() => setShowArrows(!showArrows)}
-            sx={{ 
-              justifyContent: 'flex-start',
-              textAlign: 'left',
-              '& .MuiButton-startIcon': {
-                marginRight: 1.5,
-                width: '16px',
-                display: 'flex',
-                justifyContent: 'center'
+          <Box sx={{ 
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            p: 2,
+            '&::-webkit-scrollbar': {
+              width: '6px'
+            },
+            '&::-webkit-scrollbar-track': {
+              backgroundColor: 'rgba(0, 0, 0, 0.1)',
+              borderRadius: '3px'
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: 'rgba(0, 0, 0, 0.3)',
+              borderRadius: '3px',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.5)'
               }
-            }}
-          >
-            Flèches directionnelles
-          </Button>
-          
-          {/* Contrôle de l'intensité des courbes */}
-          <Box 
-            sx={{ px: 2, pb: 1 }}
-            onMouseDown={(e) => {
-              // Empêcher le drag du panneau uniquement pour les sliders
-              if (e.target instanceof HTMLElement && 
-                  (e.target.closest('.MuiSlider-root') || e.target.classList.contains('MuiSlider-thumb'))) {
-                e.stopPropagation();
-              }
-            }}
-          >
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1, fontSize: '0.85rem' }}>
-              Intensité des courbes: {Math.round(linkCurvature * 100)}%
-            </Typography>
-            <Slider
-              value={linkCurvature}
-              onChange={(_, value) => setLinkCurvature(value as number)}
-              min={0}
-              max={0.8}
-              step={0.1}
-              size="small"
-              sx={{
-                color: 'primary.main',
-                '& .MuiSlider-thumb': {
-                  width: 16,
-                  height: 16
-                },
-                '& .MuiSlider-track': {
-                  border: 'none'
-                }
-              }}
-            />
-          </Box>
-          
-          {/* Contrôle de l'épaisseur des liens */}
-          <Box 
-            sx={{ px: 2, pb: 1 }}
-            onMouseDown={(e) => {
-              // Empêcher le drag du panneau uniquement pour les sliders
-              if (e.target instanceof HTMLElement && 
-                  (e.target.closest('.MuiSlider-root') || e.target.classList.contains('MuiSlider-thumb'))) {
-                e.stopPropagation();
-              }
-            }}
-          >
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1, fontSize: '0.85rem' }}>
-              Épaisseur des liens: {linkWidth === 0 ? 'Filet' : `${linkWidth}px`}
-            </Typography>
-            <Slider
-              value={linkWidth}
-              onChange={(_, value) => setLinkWidth(value as number)}
-              min={0}
-              max={8}
-              step={1}
-              size="small"
-              sx={{
-                color: 'secondary.main',
-                '& .MuiSlider-thumb': {
-                  width: 16,
-                  height: 16
-                },
-                '& .MuiSlider-track': {
-                  border: 'none'
-                }
-              }}
-            />
-          </Box>
-          
-          <Button 
-            variant={showParticles ? 'contained' : 'outlined'}
-            size="small"
-            startIcon={<ParticlesIcon />}
-            onClick={() => setShowParticles(!showParticles)}
-            sx={{ 
-              justifyContent: 'flex-start',
-              textAlign: 'left',
-              '& .MuiButton-startIcon': {
-                marginRight: 1.5,
-                width: '16px',
-                display: 'flex',
-                justifyContent: 'center'
-              }
-            }}
-          >
-            Particules sur liens
-          </Button>
-          
-          <Button 
-            variant={showNodeText ? 'contained' : 'outlined'}
-            size="small"
-            startIcon={<LabelIcon />}
-            onClick={() => setShowNodeText(!showNodeText)}
-            sx={{ 
-              justifyContent: 'flex-start',
-              textAlign: 'left',
-              '& .MuiButton-startIcon': {
-                marginRight: 1.5,
-                width: '16px',
-                display: 'flex',
-                justifyContent: 'center'
-              }
-            }}
-          >
-            Texte des nœuds
-          </Button>
-          
-          <Button 
-            variant={showLinkText ? 'contained' : 'outlined'}
-            size="small"
-            startIcon={<LinkIcon />}
-            onClick={() => setShowLinkText(!showLinkText)}
-            sx={{ 
-              justifyContent: 'flex-start',
-              textAlign: 'left',
-              '& .MuiButton-startIcon': {
-                marginRight: 1.5,
-                width: '16px',
-                display: 'flex',
-                justifyContent: 'center'
-              }
-            }}
-          >
-            Texte des liens
-          </Button>
-          
-          <Button 
-            variant={emitParticles ? 'contained' : 'outlined'}
-            size="small"
-            startIcon={<EffectsIcon />}
-            onClick={() => setEmitParticles(!emitParticles)}
-            sx={{ 
-              justifyContent: 'flex-start',
-              textAlign: 'left',
-              '& .MuiButton-startIcon': {
-                marginRight: 1.5,
-                width: '16px',
-                display: 'flex',
-                justifyContent: 'center'
-              }
-            }}
-          >
-            Émission particules
-          </Button>
-        </Box>
-        )}
-
-        {/* Statistiques */}
-        {!isControlsMinimized && renderStats.nodes > 0 && (
+            }
+          }}>
+            {/* Accordéon Contrôles Visuels */}
+            <Accordion 
+              expanded={controlsExpanded}
+              onChange={(_, isExpanded) => setControlsExpanded(isExpanded)}
+              sx={{ mb: 1, backgroundColor: 'rgba(240, 240, 240, 0.3)' }}
+            >
+              <AccordionSummary 
+                expandIcon={<ExpandMoreIcon sx={{ color: 'text.secondary' }} />}
+                sx={{
+                  '& .MuiAccordionSummary-expandIconWrapper': {
+                    color: 'text.secondary'
+                  }
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <SettingsIcon sx={{ fontSize: '1.1rem', color: 'primary.main' }} />
+                  <Typography variant="subtitle2" fontWeight={600} color="text.secondary">
+                    Contrôles Visuels
+                  </Typography>
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Button
+                    variant={showArrows ? "contained" : "outlined"}
+                    onClick={() => setShowArrows(!showArrows)}
+                    startIcon={<ArrowForwardIcon />}
+                    size="small"
+                    sx={{ justifyContent: 'flex-start' }}
+                  >
+                    Flèches directionnelles
+                  </Button>
+                  <Button
+                    variant={showParticles ? "contained" : "outlined"}
+                    onClick={() => setShowParticles(!showParticles)}
+                    startIcon={<BlurOnIcon />}
+                    size="small"
+                    sx={{ justifyContent: 'flex-start' }}
+                  >
+                    Particules sur liens
+                  </Button>
+                  <Button
+                    variant={showNodeText ? "contained" : "outlined"}
+                    onClick={() => setShowNodeText(!showNodeText)}
+                    startIcon={<TextFieldsIcon />}
+                    size="small"
+                    sx={{ justifyContent: 'flex-start' }}
+                  >
+                    Texte permanent nœuds
+                  </Button>
+                  <Button
+                    variant={showLinkText ? "contained" : "outlined"}
+                    onClick={() => setShowLinkText(!showLinkText)}
+                    startIcon={<LinkIcon />}
+                    size="small"
+                    sx={{ justifyContent: 'flex-start' }}
+                  >
+                    Texte permanent liens
+                  </Button>
+                  <Button
+                    variant={emitParticles ? "contained" : "outlined"}
+                    onClick={() => setEmitParticles(!emitParticles)}
+                    startIcon={<FlashOnIcon />}
+                    size="small"
+                    sx={{ justifyContent: 'flex-start' }}
+                  >
+                    Émission particules
+                  </Button>
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+            
+            {/* Accordéon Paramètres Ajustables */}
+            <Accordion 
+              expanded={parametersExpanded}
+              onChange={(_, isExpanded) => setParametersExpanded(isExpanded)}
+              sx={{ backgroundColor: 'rgba(240, 240, 240, 0.3)' }}
+            >
+              <AccordionSummary 
+                expandIcon={<ExpandMoreIcon sx={{ color: 'text.secondary' }} />}
+                sx={{
+                  '& .MuiAccordionSummary-expandIconWrapper': {
+                    color: 'text.secondary'
+                  }
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <TuneIcon sx={{ fontSize: '1.1rem', color: 'primary.main' }} />
+                  <Typography variant="subtitle2" fontWeight={600} color="text.secondary">
+                    Paramètres Ajustables
+                  </Typography>
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {/* Slider intensité courbes */}
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 0.8 }}>
+                      <LinkIcon sx={{ fontSize: '1rem', color: 'info.main' }} />
+                      <Typography variant="caption" sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'text.secondary' }}>
+                        Courbe des liens: {Math.round(linkCurvature * 100)}%
+                      </Typography>
+                    </Box>
+                    <Slider
+                      value={linkCurvature}
+                      onChange={(_, value) => setLinkCurvature(value as number)}
+                      min={0}
+                      max={1}
+                      step={0.1}
+                      size="small"
+                      sx={{
+                        color: 'info.main',
+                        '& .MuiSlider-thumb': {
+                          width: 18,
+                          height: 18
+                        },
+                        '& .MuiSlider-track': {
+                          height: 4
+                        }
+                      }}
+                      onMouseDown={(e) => {
+                        if (e.target instanceof Element && 
+                            (e.target.closest('.MuiSlider-root') || e.target.classList.contains('MuiSlider-thumb'))) {
+                          e.stopPropagation();
+                        }
+                      }}
+                    />
+                  </Box>
+                  
+                  {/* Slider épaisseur liens */}
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 0.8 }}>
+                      <LinkIcon sx={{ fontSize: '1rem', color: 'success.main' }} />
+                      <Typography variant="caption" sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'text.secondary' }}>
+                        Épaisseur: {linkWidth === 0 ? 'filet' : `${linkWidth}px`}
+                      </Typography>
+                    </Box>
+                    <Slider
+                      value={linkWidth}
+                      onChange={(_, value) => setLinkWidth(value as number)}
+                      min={0}
+                      max={8}
+                      step={0.5}
+                      size="small"
+                      sx={{
+                        color: 'success.main',
+                        '& .MuiSlider-thumb': {
+                          width: 18,
+                          height: 18
+                        },
+                        '& .MuiSlider-track': {
+                          height: 4
+                        }
+                      }}
+                      onMouseDown={(e) => {
+                        if (e.target instanceof Element && 
+                            (e.target.closest('.MuiSlider-root') || e.target.classList.contains('MuiSlider-thumb'))) {
+                          e.stopPropagation();
+                        }
+                      }}
+                    />
+                  </Box>
+                  
+                  {/* Slider espacement nœuds */}
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 0.8 }}>
+                      <NodesIcon sx={{ fontSize: '1rem', color: 'warning.main' }} />
+                      <Typography variant="caption" sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'text.secondary' }}>
+                        Espacement: {nodeSpacing}px
+                      </Typography>
+                    </Box>
+                    <Slider
+                      value={nodeSpacing}
+                      onChange={(_, value) => setNodeSpacing(value as number)}
+                      min={10}
+                      max={100}
+                      step={5}
+                      size="small"
+                      sx={{
+                        color: 'warning.main',
+                        '& .MuiSlider-thumb': {
+                          width: 18,
+                          height: 18
+                        },
+                        '& .MuiSlider-track': {
+                          height: 4
+                        }
+                      }}
+                      onMouseDown={(e) => {
+                        if (e.target instanceof Element && 
+                            (e.target.closest('.MuiSlider-root') || e.target.classList.contains('MuiSlider-thumb'))) {
+                          e.stopPropagation();
+                        }
+                      }}
+                    />
+                  </Box>
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+            
+            {/* Statistiques */}
+            {renderStats.nodes > 0 && (
           <Card sx={{ mt: 2, backgroundColor: 'rgba(255, 255, 255, 0.85)', border: '1px solid rgba(0, 0, 0, 0.2)', boxShadow: 2 }}>
             <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
@@ -1006,7 +1164,35 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
               </Box>
             </CardContent>
           </Card>
+            )}
+          </Box>
         )}
+        
+        {/* Poignée de redimensionnement */}
+        <Box
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            setIsResizing(true);
+          }}
+          sx={{
+            position: 'absolute',
+            bottom: 0,
+            right: 0,
+            width: '20px',
+            height: '20px',
+            cursor: 'nw-resize',
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              right: '3px',
+              bottom: '3px',
+              width: '5px',
+              height: '5px',
+              borderRight: '2px solid rgba(0, 0, 0, 0.3)',
+              borderBottom: '2px solid rgba(0, 0, 0, 0.3)'
+            }
+          }}
+        />
       </Paper>
 
       {/* Zone de rendu 3D */}
