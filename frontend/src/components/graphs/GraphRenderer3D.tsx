@@ -404,21 +404,58 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   useLayoutEffect(() => {
     const updateDimensions = () => {
       if (graphRef.current) {
-        const rect = graphRef.current.getBoundingClientRect();
-        setDimensions({
-          width: rect.width || 800,
-          height: rect.height || 600
+        // Chercher le conteneur parent de l'onglet "Aperçu 3D" pour obtenir l'espace réel disponible
+        let tabPanelContainer = graphRef.current.closest('[role="tabpanel"]');
+        if (!tabPanelContainer) {
+          // Fallback: chercher le conteneur parent avec flexGrow (Box principal de l'onglet)
+          tabPanelContainer = graphRef.current.closest('div[style*="flex-grow"]');
+        }
+        if (!tabPanelContainer) {
+          // Fallback final: utiliser le conteneur direct
+          tabPanelContainer = graphRef.current;
+        }
+        
+        // Utiliser des limites absolues pour éviter tout débordement
+        const maxAllowedWidth = Math.min(
+          tabPanelContainer.clientWidth,
+          window.innerWidth - 100 // Marge de sécurité
+        );
+        const maxAllowedHeight = Math.min(
+          tabPanelContainer.clientHeight,
+          window.innerHeight - 200 // Marge de sécurité
+        );
+        
+        const width = maxAllowedWidth;
+        const height = maxAllowedHeight;
+        
+        console.log('3D Container dimensions calculated:', { width, height, container: tabPanelContainer.tagName });
+        
+        console.log('3D Container dimensions:', { 
+          width, 
+          height, 
+          container: tabPanelContainer.tagName,
+          classes: tabPanelContainer.className,
+          role: (tabPanelContainer as HTMLElement).getAttribute('role')
         });
+        
+        if (width > 0 && height > 0) {
+          setDimensions({ width, height });
+        }
       }
     };
-    
+
     updateDimensions();
-    
-    const resizeObserver = new ResizeObserver(updateDimensions);
+
+    const resizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(updateDimensions);
+    });
+
     if (graphRef.current) {
-      resizeObserver.observe(graphRef.current);
+      // Observer le conteneur parent plutôt que le conteneur direct
+      let observeTarget = graphRef.current.closest('[role="tabpanel"]') || graphRef.current;
+      resizeObserver.observe(observeTarget);
     }
-    
+
     return () => {
       resizeObserver.disconnect();
     };
@@ -554,6 +591,15 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       setLoading(false);
     }
   }, [dotContent, isValid, dimensions.width, dimensions.height, showArrows, showParticles, emitParticles]);
+
+  // Effet pour redimensionner le graphique 3D quand les dimensions changent
+  useEffect(() => {
+    if (forceGraphRef.current && dimensions.width > 0 && dimensions.height > 0) {
+      forceGraphRef.current
+        .width(dimensions.width)
+        .height(dimensions.height);
+    }
+  }, [dimensions.width, dimensions.height]);
 
   // État pour les overlays de texte
   const [textOverlays, setTextOverlays] = useState<Array<{id: string, x: number, y: number, text: string, type: 'node' | 'link'}>>([]);
@@ -878,10 +924,27 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         sx={{
           width: '100%',
           height: '100%',
+          maxWidth: '100vw',
+          maxHeight: '100vh',
+          minWidth: 0,
+          minHeight: 0,
+          boxSizing: 'border-box',
           borderRadius: 1,
           overflow: 'hidden',
           cursor: 'grab',
-          '&:active': { cursor: 'grabbing' }
+          position: 'relative',
+          containIntrinsicSize: 'none',
+          contain: 'layout size',
+          '&:active': { cursor: 'grabbing' },
+          // Contraintes très strictes sur le contenu 3D
+          '& > *': {
+            maxWidth: '100% !important',
+            maxHeight: '100% !important',
+            width: '100% !important',
+            height: '100% !important',
+            boxSizing: 'border-box !important',
+            overflow: 'hidden !important'
+          }
         }}
       />
       

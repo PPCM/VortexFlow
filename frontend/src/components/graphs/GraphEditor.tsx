@@ -309,7 +309,7 @@ digraph example {
   // Rendu
   // =====================================
   return (
-    <Box sx={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* En-tête */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 600 }}>
@@ -433,7 +433,7 @@ digraph example {
               <Tab icon={<Visibility />} label="Aperçu 3D" />
             </Tabs>
             
-            <Box sx={{ flexGrow: 1, p: 0, height: 'calc(100vh - 200px)' }}>
+            <Box sx={{ flexGrow: 1, p: 0, height: 0, minHeight: 0 }}>
               <TabPanel value={currentTab} index={0}>
                 <Box sx={{ height: '100%', width: '100%' }}>
                   <DOTCodeMirrorEditor
