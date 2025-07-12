@@ -11,7 +11,8 @@ import {
   Typography, 
   Tooltip, 
   CircularProgress, 
-  Alert 
+  Alert,
+  Slider
 } from '@mui/material';
 import { 
   Settings as SettingsIcon, 
@@ -226,6 +227,8 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   const [showNodeText, setShowNodeText] = useState(false);
   const [showLinkText, setShowLinkText] = useState(false);
   const [emitParticles, setEmitParticles] = useState(false);
+  const [linkCurvature, setLinkCurvature] = useState(0.2); // Intensité des courbes (0 = droite, 1 = très courbée)
+  const [linkWidth, setLinkWidth] = useState(0); // Épaisseur des liens (0 = filet minimal, 8 = épais)
   
   // Génération d'un ID unique basé sur le contenu DOT pour la mémorisation
   const graphId = React.useMemo(() => {
@@ -298,7 +301,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   
   // Taille du panneau pour les contraintes
   const PANEL_WIDTH = 260;
-  const PANEL_HEIGHT = isControlsMinimized ? 60 : 420;
+  const PANEL_HEIGHT = isControlsMinimized ? 60 : 500;
   
   // État pour stocker les données du graphique
   const [currentGraphData, setCurrentGraphData] = useState<{nodes: ForceGraphNode[], links: ForceGraphLink[]}>({nodes: [], links: []});
@@ -503,14 +506,19 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         
 
 
-      // Configuration des liens avec flèches et particules
+      // Configuration des liens avec courbes et flèches
       graph
         .linkLabel('name')
         .linkColor('color')
-        .linkWidth(2)
-        .linkDirectionalArrowLength(showArrows ? 4 : 0)
-        .linkDirectionalArrowRelPos(1)
-        .linkDirectionalArrowColor('#ff6b6b');
+        .linkWidth(linkWidth) // Vraie épaisseur, 0 = invisible comme dans l'exemple du framework
+        // Courbes pour les liens
+        .linkCurvature(linkCurvature) // Courbure dynamique contrôlée
+        .linkCurveRotation(Math.PI / 4) // Rotation de la courbe
+        // Flèches directionnelles - facteur multiplicateur avec minimum
+        .linkDirectionalArrowLength(showArrows ? Math.max(3.5, linkWidth * 3.5) : 0) // Flèches : minimum 3.5, sinon 3.5x l'épaisseur
+        .linkDirectionalArrowRelPos(1.0) // Position à 100% du lien pour toucher parfaitement
+        .linkDirectionalArrowColor((link: any) => link.color || '#ff6b6b')
+        .linkDirectionalArrowResolution(8); // Résolution des flèches
         
       // Tooltips simples (le texte permanent est géré par Canvas)
       graph.nodeLabel((node: any) => node.name || node.id || '')
@@ -554,21 +562,8 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           }
         });
 
-      // Configuration des forces physiques
-      const linkForce = graph.d3Force('link');
-      if (linkForce) {
-        linkForce.distance(30);
-      }
-      
-      const chargeForce = graph.d3Force('charge');
-      if (chargeForce) {
-        chargeForce.strength(-120);
-      }
-      
-      const centerForce = graph.d3Force('center');
-      if (centerForce) {
-        centerForce.strength(0.1);
-      }
+      // Laisser le framework 3d-force-graph gérer l'espacement naturellement
+      // Pas de configuration forcée des forces physiques
 
       forceGraphRef.current = graph;
 
@@ -590,7 +585,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [dotContent, isValid, dimensions.width, dimensions.height, showArrows, showParticles, emitParticles]);
+  }, [dotContent, isValid, dimensions.width, dimensions.height]);
 
   // Effet pour redimensionner le graphique 3D quand les dimensions changent
   useEffect(() => {
@@ -600,6 +595,34 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         .height(dimensions.height);
     }
   }, [dimensions.width, dimensions.height]);
+
+  // Fonctions de mise à jour spécifiques pour éviter le redessin complet
+  const updateLinkProperties = useCallback(() => {
+    if (!forceGraphRef.current) return;
+    
+    forceGraphRef.current
+      .linkWidth(linkWidth)
+      .linkCurvature(linkCurvature)
+      .linkDirectionalArrowLength(showArrows ? Math.max(3.5, linkWidth * 3.5) : 0);
+  }, [linkWidth, linkCurvature, showArrows]);
+
+  const updateParticleProperties = useCallback(() => {
+    if (!forceGraphRef.current) return;
+    
+    forceGraphRef.current
+      .linkDirectionalParticles(showParticles ? (emitParticles ? 4 : 1) : 0)
+      .linkDirectionalParticleSpeed(0.008)
+      .linkDirectionalParticleWidth(2);
+  }, [showParticles, emitParticles]);
+
+  // Effets pour mettre à jour les propriétés sans redessin
+  useEffect(() => {
+    updateLinkProperties();
+  }, [updateLinkProperties]);
+
+  useEffect(() => {
+    updateParticleProperties();
+  }, [updateParticleProperties]);
 
   // État pour les overlays de texte
   const [textOverlays, setTextOverlays] = useState<Array<{id: string, x: number, y: number, text: string, type: 'node' | 'link'}>>([]);
@@ -804,6 +827,74 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           >
             Flèches directionnelles
           </Button>
+          
+          {/* Contrôle de l'intensité des courbes */}
+          <Box 
+            sx={{ px: 2, pb: 1 }}
+            onMouseDown={(e) => {
+              // Empêcher le drag du panneau uniquement pour les sliders
+              if (e.target instanceof HTMLElement && 
+                  (e.target.closest('.MuiSlider-root') || e.target.classList.contains('MuiSlider-thumb'))) {
+                e.stopPropagation();
+              }
+            }}
+          >
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1, fontSize: '0.85rem' }}>
+              Intensité des courbes: {Math.round(linkCurvature * 100)}%
+            </Typography>
+            <Slider
+              value={linkCurvature}
+              onChange={(_, value) => setLinkCurvature(value as number)}
+              min={0}
+              max={0.8}
+              step={0.1}
+              size="small"
+              sx={{
+                color: 'primary.main',
+                '& .MuiSlider-thumb': {
+                  width: 16,
+                  height: 16
+                },
+                '& .MuiSlider-track': {
+                  border: 'none'
+                }
+              }}
+            />
+          </Box>
+          
+          {/* Contrôle de l'épaisseur des liens */}
+          <Box 
+            sx={{ px: 2, pb: 1 }}
+            onMouseDown={(e) => {
+              // Empêcher le drag du panneau uniquement pour les sliders
+              if (e.target instanceof HTMLElement && 
+                  (e.target.closest('.MuiSlider-root') || e.target.classList.contains('MuiSlider-thumb'))) {
+                e.stopPropagation();
+              }
+            }}
+          >
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1, fontSize: '0.85rem' }}>
+              Épaisseur des liens: {linkWidth === 0 ? 'Filet' : `${linkWidth}px`}
+            </Typography>
+            <Slider
+              value={linkWidth}
+              onChange={(_, value) => setLinkWidth(value as number)}
+              min={0}
+              max={8}
+              step={1}
+              size="small"
+              sx={{
+                color: 'secondary.main',
+                '& .MuiSlider-thumb': {
+                  width: 16,
+                  height: 16
+                },
+                '& .MuiSlider-track': {
+                  border: 'none'
+                }
+              }}
+            />
+          </Box>
           
           <Button 
             variant={showParticles ? 'contained' : 'outlined'}
