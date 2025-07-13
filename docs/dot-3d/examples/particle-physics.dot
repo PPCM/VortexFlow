@@ -1,0 +1,265 @@
+// Exemple : Simulation de Physique des Particules
+// Cas d'usage : Modélisation d'un accélérateur de particules avec interactions
+
+digraph ParticlePhysics {
+    // === CONFIGURATION GLOBALE ===
+    defaultNodeSize = 1.0;
+    particlesEnabled = true;
+    autoResize = false;       // Tailles fixes pour précision scientifique
+    bloomEffect = true;       // Visualisation des collisions
+    autoColors = false;       // Couleurs physiques spécifiques
+
+    // === SOURCE DE PARTICULES ===
+    ProtonSource [
+        label="Source Protons",
+        geometry="Sphere",
+        dimensions="{radius: 0.8}",
+        particleGeneration=500,      // Génération intensive
+        maxParticleProcessing=500,   // Traitement instantané
+        color="#FF1744",             // Rouge énergique
+        image="https://example.com/proton-source.jpg"
+    ];
+
+    ElectronSource [
+        label="Source Électrons",
+        geometry="Sphere", 
+        dimensions="{radius: 0.6}",
+        particleGeneration=800,      // Plus petites, plus nombreuses
+        maxParticleProcessing=800,
+        color="#2196F3"              // Bleu électron
+    ];
+
+    // === ACCÉLÉRATEURS ===
+    LinearAccelerator [
+        label="Accélérateur Linéaire",
+        geometry="Cylinder",
+        dimensions="{radius: 0.5, height: 4.0}",
+        particleGeneration=0,        // N'en génère pas
+        maxParticleProcessing=600,   // Traite avec pertes
+        color="#4CAF50"
+    ];
+
+    CyclotronA [
+        label="Cyclotron A",
+        geometry="Torus",
+        dimensions="{tube: 0.3, tubularSegments: 16, radialSegments: 12}",
+        particleGeneration=0,
+        maxParticleProcessing=400,   // Pertes par rayonnement
+        color="#FF9800"
+    ];
+
+    CyclotronB [
+        label="Cyclotron B", 
+        geometry="Torus",
+        dimensions="{tube: 0.3, tubularSegments: 16, radialSegments: 12}",
+        particleGeneration=0,
+        maxParticleProcessing=420,   // Légèrement plus efficace
+        color="#9C27B0"
+    ];
+
+    // === DÉTECTEURS ===
+    ChamberDetector [
+        label="Chambre à Bulles",
+        geometry="Box",
+        dimensions="{width: 2.5, height: 2.5, depth: 2.5}",
+        particleGeneration=0,
+        maxParticleProcessing=200,   // Limite de détection
+        color="#00BCD4"
+    ];
+
+    CalorimeterA [
+        label="Calorimètre A",
+        geometry="Cylinder",
+        dimensions="{radius: 1.2, height: 1.8}",
+        particleGeneration=0,
+        maxParticleProcessing=150,   // Mesure énergie
+        color="#795548"
+    ];
+
+    CalorimeterB [
+        label="Calorimètre B",
+        geometry="Cylinder", 
+        dimensions="{radius: 1.2, height: 1.8}",
+        particleGeneration=0,
+        maxParticleProcessing=150,
+        color="#607D8B"
+    ];
+
+    // === POINTS DE COLLISION ===
+    CollisionPoint [
+        label="Point de Collision",
+        geometry="Sphere",
+        dimensions="{radius: 1.5}",
+        particleGeneration=100,      // Génère particules secondaires
+        maxParticleProcessing=50,    // Goulot volontaire pour accumulation
+        color="#FFEB3B"              // Jaune brillant collision
+    ];
+
+    // === ANALYSEUR FINAL ===
+    DataAnalyzer [
+        label="Analyseur de Données",
+        geometry="Box",
+        dimensions="{width: 2.0, height: 1.5, depth: 3.0}",
+        particleGeneration=0,
+        maxParticleProcessing=1000,  // Traitement informatique rapide
+        color="#3F51B5"
+    ];
+
+    // === FLUX PRIMAIRES ===
+    // Sources vers accélérateurs
+    ProtonSource -> LinearAccelerator [
+        label="Injection Protons",
+        maxParticleFlow=400,
+        particleSpeed=1.2,           // Vitesse initiale modérée
+        color="#E53935",
+        style="solid"
+    ];
+
+    ElectronSource -> LinearAccelerator [
+        label="Injection Électrons",
+        maxParticleFlow=600,
+        particleSpeed=1.8,           // Électrons plus rapides
+        color="#1E88E5",
+        style="solid"
+    ];
+
+    // === ACCÉLÉRATION SÉQUENTIELLE ===
+    LinearAccelerator -> CyclotronA [
+        label="Transfert A",
+        maxParticleFlow=300,         // Pertes dans l'accélérateur
+        particleSpeed=2.5,           // Accélération significative
+        color="#43A047",
+        style="dashed"
+    ];
+
+    LinearAccelerator -> CyclotronB [
+        label="Transfert B",
+        maxParticleFlow=250,
+        particleSpeed=2.3,
+        color="#43A047", 
+        style="dashed"
+    ];
+
+    // === VERS COLLISION ===
+    CyclotronA -> CollisionPoint [
+        label="Faisceau A",
+        maxParticleFlow=200,         // Pertes cyclotron
+        particleSpeed=3.8,           // Très haute énergie
+        color="#FB8C00",
+        style="solid"
+    ];
+
+    CyclotronB -> CollisionPoint [
+        label="Faisceau B",
+        maxParticleFlow=210,
+        particleSpeed=3.9,           // Légèrement supérieur
+        color="#8E24AA",
+        style="solid"
+    ];
+
+    // === DÉTECTION MULTI-PATH ===
+    // Collision vers différents détecteurs
+    CollisionPoint -> ChamberDetector [
+        label="Traces Visibles",
+        maxParticleFlow=80,          // Fraction détectable
+        particleSpeed=1.5,
+        color="#26C6DA",
+        style="dotted"
+    ];
+
+    CollisionPoint -> CalorimeterA [
+        label="Mesure Énergie A",
+        maxParticleFlow=60,
+        particleSpeed=2.0,
+        color="#8D6E63",
+        style="dotted"
+    ];
+
+    CollisionPoint -> CalorimeterB [
+        label="Mesure Énergie B", 
+        maxParticleFlow=65,
+        particleSpeed=2.1,
+        color="#78909C",
+        style="dotted"
+    ];
+
+    // === ANALYSE FINALE ===
+    // Tous les détecteurs vers analyseur
+    ChamberDetector -> DataAnalyzer [
+        label="Données Traces",
+        maxParticleFlow=50,          // Données numériques
+        particleSpeed=0.8,           // Transmission data
+        color="#3949AB",
+        style="solid"
+    ];
+
+    CalorimeterA -> DataAnalyzer [
+        label="Données Énergie A",
+        maxParticleFlow=40,
+        particleSpeed=0.9,
+        color="#3949AB",
+        style="solid"
+    ];
+
+    CalorimeterB -> DataAnalyzer [
+        label="Données Énergie B",
+        maxParticleFlow=45,
+        particleSpeed=0.85,
+        color="#3949AB", 
+        style="solid"
+    ];
+
+    // === BOUCLES DE RÉTROACTION ===
+    // Contrôle qualité et ajustements
+    DataAnalyzer -> LinearAccelerator [
+        label="Calibration",
+        maxParticleFlow=10,          // Signaux de contrôle
+        particleSpeed=0.3,           // Lent, contrôle
+        color="#757575",
+        style="dotted"
+    ];
+
+    DataAnalyzer -> CyclotronA [
+        label="Ajustement A",
+        maxParticleFlow=8,
+        particleSpeed=0.3,
+        color="#757575",
+        style="dotted"
+    ];
+
+    DataAnalyzer -> CyclotronB [
+        label="Ajustement B",
+        maxParticleFlow=8,
+        particleSpeed=0.3,
+        color="#757575",
+        style="dotted"
+    ];
+
+    // === FLUX CROISÉS PARTICULES SECONDAIRES ===
+    // Particules secondaires de collision
+    CollisionPoint -> ProtonSource [
+        label="Protons Secondaires",
+        maxParticleFlow=20,          // Faible taux
+        particleSpeed=1.0,
+        color="#FF8A65",
+        style="dashed"
+    ];
+
+    CollisionPoint -> ElectronSource [
+        label="Électrons Secondaires", 
+        maxParticleFlow=30,
+        particleSpeed=1.1,
+        color="#81C784",
+        style="dashed"
+    ];
+}
+
+// === PHÉNOMÈNES PHYSIQUES MODÉLISÉS ===
+// 1. Génération de particules : Sources physiques
+// 2. Accélération progressive : Gain d'énergie/vitesse  
+// 3. Pertes par rayonnement : Réduction flux dans cyclotrons
+// 4. Collision haute énergie : Goulot d'étranglement volontaire
+// 5. Détection multi-canal : Séparation des événements
+// 6. Particules secondaires : Création de nouvelles particules
+// 7. Rétroaction de contrôle : Ajustements temps réel
+// 8. Accumulation aux points critiques : Bloom effect visible

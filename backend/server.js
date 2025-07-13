@@ -147,7 +147,7 @@ app.get('/api/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/public', publicRoutes);
-app.use('/api/graphs', validateSession, graphRoutes);
+app.use('/api/graphs', graphRoutes);
 app.use('/api/users', validateSession, userRoutes);
 app.use('/api/simulation', validateSession, simulationRoutes);
 app.use('/api/dashboard', validateSession, dashboardRoutes);

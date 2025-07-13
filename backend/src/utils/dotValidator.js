@@ -12,18 +12,39 @@ class DotValidator {
       'strict', 'label', 'color', 'style', 'shape',
       'fontsize', 'fontname', 'fontcolor', 'fillcolor',
       'width', 'height', 'penwidth', 'arrowhead', 'arrowtail',
-      // VortexFlow extensions
+      // VortexFlow legacy extensions
       'flow_rate', 'capacity', 'latency', 'bandwidth',
       'packet_size', 'processing_time', 'queue_size',
-      'failure_rate', 'recovery_time', 'priority'
+      'failure_rate', 'recovery_time', 'priority',
+      // VortexFlow 3D extensions
+      'geometry', 'dimensions', 'particleGeneration', 'maxParticleProcessing',
+      'particleSpeed', 'maxParticleFlow', 'image', 'autoResize',
+      'bloomEffect', 'particlesEnabled', 'autoColors', 'defaultNodeSize'
     ]);
 
     this.nodeShapes = new Set([
+      // Standard DOT shapes
       'box', 'circle', 'ellipse', 'point', 'egg', 'triangle',
       'diamond', 'trapezium', 'parallelogram', 'house',
       'pentagon', 'hexagon', 'septagon', 'octagon',
-      'plaintext', 'record', 'Mrecord'
+      'plaintext', 'record', 'Mrecord',
+      // VortexFlow 3D geometries
+      'Sphere', 'Box', 'Cylinder', 'Cone', 'Torus'
     ]);
+
+    // VortexFlow 3D geometries validation
+    this.geometries3D = new Set([
+      'Sphere', 'Box', 'Cylinder', 'Cone', 'Torus'
+    ]);
+
+    // Dimension parameters for each geometry
+    this.geometryDimensions = {
+      'Sphere': ['radius'],
+      'Box': ['width', 'height', 'depth'],
+      'Cylinder': ['radius', 'height'],
+      'Cone': ['radius', 'height'],
+      'Torus': ['radius', 'tube']
+    };
 
     this.edgeStyles = new Set([
       'solid', 'dashed', 'dotted', 'bold', 'invis'
@@ -146,11 +167,19 @@ class DotValidator {
       }
     };
 
-    // Check for graph declaration
-    const graphMatch = dotCode.match(/^\s*(strict\s+)?(di)?graph\s+(\w+)?\s*\{/i);
+    // Clean comments FIRST before checking graph declaration
+    const cleanedForDeclaration = dotCode
+      .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
+      .replace(/\/\/.*$/gm, '') // Remove // comments
+      .trim();
+
+    // Check for graph declaration on cleaned content
+    const graphMatch = cleanedForDeclaration.match(/^\s*(strict\s+)?(di)?graph\s+(\w+)?\s*\{/i);
     if (!graphMatch) {
       result.valid = false;
       result.errors.push('Missing graph declaration. Must start with "graph" or "digraph"');
+      console.log('[BACKEND] DOT content received:', dotCode.substring(0, 200) + '...');
+      console.log('[BACKEND] Cleaned content for check:', cleanedForDeclaration.substring(0, 200) + '...');
       return result;
     }
 
@@ -299,7 +328,6 @@ class DotValidator {
       const value = match[3] || match[4];
       attributes[key] = value;
     }
-
     return attributes;
   }
 
@@ -309,26 +337,58 @@ class DotValidator {
   validateSyntax(dotCode) {
     const result = { valid: true, errors: [], warnings: [] };
 
-    // Check for semicolons (recommended but not required)
-    const statements = dotCode.split(/[{}]/).filter(s => s.trim());
-    for (const statement of statements) {
-      const lines = statement.split('\n').filter(line => line.trim());
-      for (const line of lines) {
-        if (line.trim() && !line.trim().endsWith(';') && 
-            !line.includes('graph') && !line.includes('{') && !line.includes('}')) {
-          result.warnings.push(`Missing semicolon at end of statement: "${line.trim()}"`);
+    // Clean code for analysis
+    let cleanCode = dotCode
+      .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
+      .replace(/\/\/.*$/gm, ''); // Remove // comments
+
+    // Check for semicolons on global settings (single line assignments)
+    const globalSettingPattern = /^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*[^;\n]+$/gm;
+    let match = globalSettingPattern.exec(cleanCode);
+    while (match !== null) {
+      const line = match[0].trim();
+      if (!line.endsWith(';') && !line.includes('[') && !line.includes('{')) {
+        result.warnings.push(`Missing semicolon at end of global setting: "${line}"`);
+      }
+      match = globalSettingPattern.exec(cleanCode);
+    }
+
+    // Check node declarations (can be multi-line) - match complete nodes with brackets
+    const nodePattern = /\w+\s*\[([\s\S]*?)\];?/g;
+    match = nodePattern.exec(cleanCode);
+    while (match !== null) {
+      const fullMatch = match[0].trim();
+      if (!fullMatch.endsWith('];')) {
+        // Only warn if it's clearly missing semicolon, not a formatting issue
+        if (fullMatch.endsWith(']')) {
+          result.warnings.push(`Node declaration should end with ]; : "${fullMatch.substring(0, 50)}..."`);
         }
       }
+      match = nodePattern.exec(cleanCode);
+    }
+
+    // Check edge declarations - match complete edge statements
+    const edgePattern = /\w+\s*->\s*\w+[^;]*?(?=;|\n|$)/g;
+    match = edgePattern.exec(cleanCode);
+    while (match !== null) {
+      const edgeMatch = match[0].trim();
+      // Look ahead to see if semicolon follows
+      const nextChar = cleanCode.charAt(match.index + match[0].length);
+      if (nextChar !== ';' && !edgeMatch.includes('[')) {
+        result.warnings.push(`Edge declaration should end with ; : "${edgeMatch}"`);
+      }
+      match = edgePattern.exec(cleanCode);
     }
 
     // Check for invalid characters in identifiers
     const identifierPattern = /\b([a-zA-Z_][a-zA-Z0-9_]*)\b/g;
-    let match;
-    while ((match = identifierPattern.exec(dotCode)) !== null) {
+    match = identifierPattern.exec(dotCode);
+    while (match !== null) {
       const identifier = match[1];
       if (identifier.length > 50) {
         result.warnings.push(`Identifier "${identifier}" is very long (${identifier.length} chars)`);
       }
+      match = identifierPattern.exec(dotCode);
     }
 
     // Check for proper quoting of labels with spaces
@@ -443,12 +503,21 @@ class DotValidator {
   validateVortexFlowExtensions(dotCode) {
     const result = { hasExtensions: false, warnings: [] };
 
+    // Legacy VortexFlow attributes
     const vortexFlowAttrs = [
       'flow_rate', 'capacity', 'latency', 'bandwidth',
       'packet_size', 'processing_time', 'queue_size',
       'failure_rate', 'recovery_time', 'priority'
     ];
 
+    // VortexFlow 3D attributes
+    const vortexFlow3DAttrs = [
+      'geometry', 'dimensions', 'particleGeneration', 'maxParticleProcessing',
+      'particleSpeed', 'maxParticleFlow', 'image', 'autoResize',
+      'bloomEffect', 'particlesEnabled', 'autoColors', 'defaultNodeSize'
+    ];
+
+    // Check legacy attributes
     for (const attr of vortexFlowAttrs) {
       if (dotCode.includes(attr)) {
         result.hasExtensions = true;
@@ -482,6 +551,147 @@ class DotValidator {
           }
         }
       }
+    }
+
+    // Check 3D attributes
+    for (const attr of vortexFlow3DAttrs) {
+      if (dotCode.includes(attr)) {
+        result.hasExtensions = true;
+        
+        // Validate 3D attributes
+        const validate3DResult = this.validate3DAttributes(dotCode, attr);
+        result.warnings.push(...validate3DResult.warnings);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Validate 3D specific attributes
+   */
+  validate3DAttributes(dotCode, attribute) {
+    const result = { warnings: [] };
+    
+    // Enhanced regex to handle complex values including JSON objects with nested braces
+    // Pattern matches: attribute = "value" or attribute = {complex: value}
+    const pattern = new RegExp(
+      `${attribute}\s*=\s*(?:"([^"]*)"|({[^}]*})|([^,\];\s]+))`,
+      'g'
+    );
+    let match;
+
+    while ((match = pattern.exec(dotCode)) !== null) {
+      // Extract value from quoted (group 1), braced object (group 2), or unquoted (group 3)
+      const value = (match[1] || match[2] || match[3]).trim();
+
+      switch (attribute) {
+        case 'geometry':
+          if (!this.geometries3D.has(value)) {
+            result.warnings.push(`Unknown 3D geometry: "${value}". Valid geometries: ${Array.from(this.geometries3D).join(', ')}`);
+          }
+          break;
+
+        case 'dimensions':
+          try {
+            // Support both JSON-strict and JavaScript object literal syntax
+            let dimensions;
+            
+            // If it looks like JSON (quoted keys), parse as JSON
+            if (value.includes('"')) {
+              dimensions = JSON.parse(value);
+            } else {
+              // Convert JavaScript object literal to JSON and parse
+              // Handle unquoted keys: {width: 1.0} -> {"width": 1.0}
+              const jsonString = value.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*:)/g, '$1"$2"$3');
+              dimensions = JSON.parse(jsonString);
+            }
+            
+            if (typeof dimensions !== 'object' || dimensions === null) {
+              result.warnings.push(`Invalid dimensions format: "${value}" (must be object)`);
+            } else {
+              // Validate dimension values are positive numbers
+              for (const [key, val] of Object.entries(dimensions)) {
+                const numVal = parseFloat(val);
+                if (isNaN(numVal) || numVal <= 0) {
+                  result.warnings.push(`Invalid dimension ${key}: "${val}" (must be positive number)`);
+                }
+              }
+            }
+          } catch (e) {
+            result.warnings.push(`Invalid dimensions format: "${value}" - ${e.message}`);
+          }
+          break;
+
+        case 'particleGeneration':
+        case 'maxParticleProcessing':
+        case 'particleSpeed':
+        case 'maxParticleFlow':
+        case 'defaultNodeSize':
+          const numValue = parseFloat(value);
+          if (isNaN(numValue) || numValue < 0) {
+            result.warnings.push(`Invalid ${attribute}: "${value}" (must be non-negative number)`);
+          }
+          if (attribute === 'particleSpeed' && numValue > 100) {
+            result.warnings.push(`Very high particle speed: ${numValue} (may impact performance)`);
+          }
+          break;
+
+        case 'autoResize':
+        case 'bloomEffect':
+        case 'particlesEnabled':
+        case 'autoColors':
+          if (!['true', 'false', '1', '0'].includes(value.toLowerCase())) {
+            result.warnings.push(`Invalid boolean value for ${attribute}: "${value}" (use true/false or 1/0)`);
+          }
+          break;
+
+        case 'image':
+          // Basic URL/path validation
+          if (value && !value.match(/\.(jpg|jpeg|png|gif|svg|webp)$/i) && !value.startsWith('http')) {
+            result.warnings.push(`Image path "${value}" may not be a valid image file`);
+          }
+          break;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Validate geometry and dimensions consistency
+   */
+  validateGeometryDimensions(geometry, dimensions) {
+    const result = { warnings: [] };
+    
+    if (!this.geometries3D.has(geometry)) {
+      return result;
+    }
+
+    const requiredDimensions = this.geometryDimensions[geometry];
+    if (!requiredDimensions) {
+      return result;
+    }
+
+    try {
+      const dims = typeof dimensions === 'string' ? JSON.parse(dimensions) : dimensions;
+      
+      // Check for missing required dimensions
+      for (const reqDim of requiredDimensions) {
+        if (!(reqDim in dims)) {
+          result.warnings.push(`Geometry "${geometry}" missing required dimension: "${reqDim}"`);
+        }
+      }
+
+      // Check for unexpected dimensions
+      for (const dimKey of Object.keys(dims)) {
+        if (!requiredDimensions.includes(dimKey)) {
+          result.warnings.push(`Geometry "${geometry}" has unexpected dimension: "${dimKey}". Expected: ${requiredDimensions.join(', ')}`);
+        }
+      }
+
+    } catch (e) {
+      result.warnings.push(`Cannot validate dimensions for geometry "${geometry}": invalid JSON`);
     }
 
     return result;

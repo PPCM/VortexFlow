@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
 const { Graph, GraphVersion, GraphShare, User, SimulationSession } = require('../models');
-const { requireGraphAccess, requireEditor, requireAdmin, logActivity } = require('../middleware/auth');
+const { requireGraphAccess, requireEditor, requireAdmin, validateSession, logActivity } = require('../middleware/auth');
 const dotValidator = require('../utils/dotValidator');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');
@@ -804,6 +804,83 @@ router.get('/dot-examples',
       res.json({ examples });
     } else {
       res.json({ example: examples[type] || examples.simple });
+    }
+  })
+);
+
+/**
+ * POST /api/graphs/parse-dot
+ * Parse DOT content using robust backend parser
+ * Available for authenticated users
+ */
+router.post('/parse-dot',
+  validateSession,
+  asyncHandler(async (req, res) => {
+    const { dotContent } = req.body;
+    
+    if (!dotContent) {
+      return res.status(400).json({
+        error: 'DOT content is required'
+      });
+    }
+    
+    if (dotContent.length > 1000000) {
+      return res.status(400).json({
+        error: 'DOT content too large'
+      });
+    }
+    
+    try {
+      // Utiliser le parser DOT robuste existant
+      const parseResult = dotValidator.parseDotStructure(dotContent);
+      
+      if (!parseResult.valid) {
+        return res.status(400).json({
+          error: 'DOT parsing failed',
+          details: parseResult.errors
+        });
+      }
+      
+      // Convertir l'AST vers le format attendu par le frontend
+      const nodes = parseResult.ast.nodes.map(node => ({
+        id: node.id,
+        label: node.attributes.label || node.id,
+        name: node.attributes.label || node.id,
+        size: node.attributes.val || node.attributes.size || '8',
+        color: node.attributes.color || '#1976D2',
+        geometry: node.attributes.geometry,
+        dimensions: node.attributes.dimensions,
+        particleGeneration: node.attributes.particleGeneration,
+        maxParticleProcessing: node.attributes.maxParticleProcessing,
+        image: node.attributes.image,
+        autoResize: node.attributes.autoResize,
+        bloomEffect: node.attributes.bloomEffect
+      }));
+      
+      const links = parseResult.ast.edges.map(edge => ({
+        source: edge.from,
+        target: edge.to,
+        label: edge.attributes.label || '',
+        color: edge.attributes.color || '#888',
+        maxParticleFlow: edge.attributes.maxParticleFlow,
+        particleSpeed: edge.attributes.particleSpeed,
+        style: edge.attributes.style || 'solid'
+      }));
+      
+      console.log(`🎆 Backend DOT parsing successful: ${nodes.length} nodes, ${links.length} links`);
+      
+      res.json({
+        nodes,
+        links,
+        metadata: parseResult.metadata
+      });
+      
+    } catch (error) {
+      console.error('DOT parsing error:', error);
+      res.status(500).json({
+        error: 'Internal server error during DOT parsing',
+        message: error.message
+      });
     }
   })
 );

@@ -40,27 +40,43 @@ import {
   Tune as TuneIcon
 } from '@mui/icons-material';
 import ForceGraph3D from '3d-force-graph';
+import * as THREE from 'three';
 import { GraphData, GraphNode, GraphEdge } from '../../types';
+
+// Déclaration de type pour THREE.js global
+declare global {
+  interface Window {
+    THREE: any;
+  }
+}
 
 // =====================================
 // Types pour le rendu 3D
-// =====================================
+// ======================================
 interface GraphRenderer3DProps {
   dotContent: string;
   isValid: boolean;
   parsedData?: GraphData;
 }
 
-// Types pour 3d-force-graph
+// Types pour la gestion des données 3D étendues
 interface ForceGraphNode {
   id: string;
-  name: string;
-  group: number;
+  name?: string;
+  group?: number;
+  val?: number;
+  color?: string;
   x?: number;
   y?: number;
   z?: number;
-  val?: number;
-  color?: string;
+  // Extensions 3D
+  geometry?: '3d-box' | '3d-cone' | '3d-cylinder' | '3d-sphere' | '3d-torus';
+  dimensions?: any;
+  particleGeneration?: number;
+  maxParticleProcessing?: number;
+  image?: string;
+  autoResize?: boolean;
+  bloomEffect?: boolean;
 }
 
 interface ForceGraphLink {
@@ -69,13 +85,48 @@ interface ForceGraphLink {
   value?: number;
   color?: string;
   name?: string;
+  // Extensions 3D
+  maxParticleFlow?: number;
+  particleSpeed?: number;
+  style?: 'solid' | 'dashed' | 'dotted';
 }
 
 // =====================================
 // Utilitaires de parsing DOT vers 3D
 // =====================================
 class DotTo3DConverter {
-  static parseDotToGraphData(dotContent: string): { nodes: ForceGraphNode[], links: ForceGraphLink[] } {
+  static async parseDotToGraphData(dotContent: string): Promise<{ nodes: ForceGraphNode[], links: ForceGraphLink[] }> {
+    // Utiliser le backend pour le parsing robuste
+    try {
+      const apiUrl = 'http://192.168.5.30:5000/api/public/parse-dot';
+      console.log(`🔍 Calling backend API: ${apiUrl}`);
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ dotContent }),
+      });
+      
+      if (response.ok) {
+        const backendData = await response.json();
+        console.log('✅ Backend parsing successful:', backendData);
+        return this.convertBackendDataToGraph(backendData);
+      } else {
+        const errorText = await response.text();
+        console.warn('⚠️ Backend parsing failed (status:', response.status, '):', errorText);
+        console.warn('Falling back to frontend parsing');
+        return this.parseDotToGraphDataFrontend(dotContent);
+      }
+    } catch (error) {
+      console.warn('⚠️ Backend not available, using frontend parsing. Error:', error instanceof Error ? error.message : String(error));
+      console.warn('Full error:', error);
+      return this.parseDotToGraphDataFrontend(dotContent);
+    }
+  }
+  
+  static parseDotToGraphDataFrontend(dotContent: string): { nodes: ForceGraphNode[], links: ForceGraphLink[] } {
     const nodes: ForceGraphNode[] = [];
     const links: ForceGraphLink[] = [];
     const nodeMap = new Map<string, ForceGraphNode>();
@@ -151,18 +202,24 @@ class DotTo3DConverter {
         target: targetId,
         value: parseFloat(attrs.weight || '1'),
         color: attrs.color || '#999999',
-        name: attrs.name || attrs.label || `${sourceId} → ${targetId}`
+        name: attrs.name || attrs.label || `${sourceId} → ${targetId}`,
+        // Extensions 3D pour les liens
+        maxParticleFlow: attrs.maxParticleFlow ? parseInt(attrs.maxParticleFlow) : undefined,
+        particleSpeed: attrs.particleSpeed ? parseFloat(attrs.particleSpeed) : undefined,
+        style: attrs.style as 'solid' | 'dashed' | 'dotted' || 'solid'
       });
     }
     
-    // 2. Ensuite traiter les définitions de nœuds avec attributs
-    const nodeWithAttrsRegex = /([A-Za-z]\w*)\s*\[([^\]]*)\]/g;
-    let nodeMatch;
+    // Nettoyer le contenu DOT en supprimant les commentaires inline
+    const contentWithoutComments = cleanContent.replace(/\/\/.*$/gm, '');
+    console.log('🧹 Content after removing comments (first 500 chars):', contentWithoutComments.substring(0, 500));
     
-    nodeWithAttrsRegex.lastIndex = 0;
-    while ((nodeMatch = nodeWithAttrsRegex.exec(cleanContent)) !== null) {
-      const nodeId = nodeMatch[1];
-      const attrsString = nodeMatch[2];
+    // 2. Parser robuste pour les nœuds avec attributs multi-lignes
+    const nodeMatches = this.parseNodesWithAttributes(contentWithoutComments);
+    
+    for (const { nodeId, attrsString } of nodeMatches) {
+      console.log(`🎯 Node ${nodeId} - Captured attrs length:`, attrsString.length);
+      console.log(`🎯 Node ${nodeId} - First 100 chars:`, attrsString.substring(0, 100) + '...');
       
       // Ignorer si c'est un mot-clé DOT
       if (dotKeywords.has(nodeId.toLowerCase())) {
@@ -174,13 +231,32 @@ class DotTo3DConverter {
       
       // Mettre à jour le nœud existant ou en créer un nouveau
       const existingNode = nodeMap.get(nodeId);
+      // Debug: log des attributs extraits pour ce nœud
+      console.log(`🔍 Nœud ${nodeId} - Attributs extraits:`, {
+        attrs,
+        geometry: attrs.geometry,
+        dimensions: attrs.dimensions,
+        particleGeneration: attrs.particleGeneration,
+        color: attrs.color
+      });
+      
       const node: ForceGraphNode = {
         id: nodeId,
         name: attrs.name || attrs.label || nodeId,
         group: existingNode?.group || (nodeMap.size % 5 + 1),
         val: parseFloat(attrs.size || '8'),
-        color: attrs.color || existingNode?.color || `hsl(${(nodeMap.size * 60) % 360}, 70%, 50%)`
+        color: attrs.color || existingNode?.color || `hsl(${(nodeMap.size * 60) % 360}, 70%, 50%)`,
+        // Extensions 3D pour les nœuds
+        geometry: this.parseGeometry(attrs.geometry),
+        dimensions: this.parseDimensions(attrs.dimensions),
+        particleGeneration: attrs.particleGeneration ? parseInt(attrs.particleGeneration) : undefined,
+        maxParticleProcessing: attrs.maxParticleProcessing ? parseInt(attrs.maxParticleProcessing) : undefined,
+        image: attrs.image,
+        autoResize: attrs.autoResize ? this.parseBoolean(attrs.autoResize) : undefined,
+        bloomEffect: attrs.bloomEffect ? this.parseBoolean(attrs.bloomEffect) : undefined
       };
+      
+      console.log(`✅ Nœud ${nodeId} final:`, node);
       
       nodeMap.set(nodeId, node);
       connectedNodes.add(nodeId);
@@ -195,21 +271,192 @@ class DotTo3DConverter {
     return { nodes, links };
   }
   
-  private static parseAttributes(attrsString: string): Record<string, string> {
+  // Parser robuste pour extraire les nœuds avec leurs attributs complets
+  private static parseNodesWithAttributes(content: string): Array<{nodeId: string, attrsString: string}> {
+    const results: Array<{nodeId: string, attrsString: string}> = [];
+    
+    // Trouver tous les débuts de définition de nœuds
+    const nodeStartRegex = /([A-Za-z]\w*)\s*\[/g;
+    let match;
+    
+    while ((match = nodeStartRegex.exec(content)) !== null) {
+      const nodeId = match[1];
+      const startPos = match.index + match[0].length - 1; // Position du '['
+      
+      // Compter les crochets pour trouver la fermeture correspondante
+      let bracketCount = 0;
+      let endPos = startPos;
+      
+      for (let i = startPos; i < content.length; i++) {
+        const char = content[i];
+        if (char === '[') {
+          bracketCount++;
+        } else if (char === ']') {
+          bracketCount--;
+          if (bracketCount === 0) {
+            endPos = i;
+            break;
+          }
+        }
+      }
+      
+      if (bracketCount === 0) {
+        // Extraire le contenu entre les crochets
+        const attrsString = content.substring(startPos + 1, endPos);
+        results.push({ nodeId, attrsString });
+        console.log(`🔍 Extracted ${nodeId}: ${attrsString.length} chars, ending with: "${attrsString.slice(-20)}"`);
+      } else {
+        console.warn(`⚠️ Crochets non équilibrés pour le nœud ${nodeId}`);
+      }
+    }
+    
+    return results;
+  }
+  
+  // Convertir les données du backend vers le format attendu par le graphique 3D
+  static convertBackendDataToGraph(backendData: any): { nodes: ForceGraphNode[], links: ForceGraphLink[] } {
+    const nodes: ForceGraphNode[] = [];
+    const links: ForceGraphLink[] = [];
+    
+    // Convertir les nœuds du backend
+    if (backendData.nodes) {
+      for (const node of backendData.nodes) {
+        nodes.push({
+          id: node.id,
+          name: node.label || node.name || node.id,
+          group: 1,
+          val: parseFloat(node.size || '8'),
+          color: node.color || '#1976D2',
+          geometry: this.parseGeometry(node.geometry),
+          dimensions: this.parseDimensions(node.dimensions),
+          particleGeneration: node.particleGeneration ? parseInt(node.particleGeneration) : undefined,
+          maxParticleProcessing: node.maxParticleProcessing ? parseInt(node.maxParticleProcessing) : undefined,
+          image: node.image,
+          autoResize: node.autoResize ? this.parseBoolean(node.autoResize) : undefined,
+          bloomEffect: node.bloomEffect ? this.parseBoolean(node.bloomEffect) : undefined
+        });
+      }
+    }
+    
+    // Convertir les liens du backend
+    if (backendData.links) {
+      for (const link of backendData.links) {
+        links.push({
+          source: link.source,
+          target: link.target,
+          name: link.label || '',
+          color: link.color || '#888',
+          maxParticleFlow: link.maxParticleFlow ? parseInt(link.maxParticleFlow) : undefined,
+          particleSpeed: link.particleSpeed ? parseFloat(link.particleSpeed) : undefined,
+          style: link.style as 'solid' | 'dashed' | 'dotted' || 'solid'
+        });
+      }
+    }
+    
+    console.log(`🔄 Converted backend data: ${nodes.length} nodes, ${links.length} links`);
+    return { nodes, links };
+  }
+
+  private static parseAttributes(attrsString?: string): Record<string, string> {
     const attrs: Record<string, string> = {};
     if (!attrsString) return attrs;
     
-    // Parser les attributs du format: key="value", key=value, key="value with spaces"
+    console.log('🔍 Raw attrsString to parse:', JSON.stringify(attrsString));
+    
+    // Parser les attributs avec support des objets JSON complexes
+    // Regex simplifiée qui capture correctement le contenu entre guillemets
     const attrRegex = /([A-Za-z][A-Za-z0-9_]*)\s*=\s*(?:"([^"]*)"|([^,\s]+))/g;
     let match;
     
     while ((match = attrRegex.exec(attrsString)) !== null) {
       const key = match[1];
-      const value = match[2] || match[3]; // Valeur avec ou sans guillemets
+      // Récupérer la valeur du bon groupe: quoted (2) ou simple (3)
+      const value = match[2] || match[3];
+      
+      // Debug: log des valeurs capturées pour dimensions
+      if (key === 'dimensions') {
+        console.log('🔍 Parsing dimensions:', {
+          key,
+          fullMatch: match[0],
+          quotedGroup: match[2],
+          simpleGroup: match[3],
+          finalValue: value
+        });
+      }
+      
       attrs[key] = value;
     }
     
     return attrs;
+  }
+
+  // Parser la géométrie 3D depuis la valeur DOT
+  private static parseGeometry(geometryValue?: string): '3d-box' | '3d-cone' | '3d-cylinder' | '3d-sphere' | '3d-torus' | undefined {
+    if (!geometryValue) return undefined;
+    
+    const geometry = geometryValue.toLowerCase();
+    switch (geometry) {
+      case 'box': return '3d-box';
+      case 'cone': return '3d-cone';
+      case 'cylinder': return '3d-cylinder';
+      case 'sphere': return '3d-sphere';
+      case 'torus': return '3d-torus';
+      default: return undefined;
+    }
+  }
+
+  // Parser les dimensions JSON depuis la valeur DOT
+  private static parseDimensions(dimensionsValue?: string): any {
+    if (!dimensionsValue) return undefined;
+    
+    console.log('📝 Parsing dimensions input:', JSON.stringify(dimensionsValue));
+    
+    try {
+      let cleanValue = dimensionsValue.trim();
+      console.log('📝 Cleaned value:', JSON.stringify(cleanValue));
+      
+      let dimensions: any;
+      
+      // Si ça ressemble à du JSON (clés entre guillemets), parser comme JSON
+      if (cleanValue.includes('"')) {
+        console.log('📝 Parsing as JSON (contains quotes)');
+        dimensions = JSON.parse(cleanValue);
+      } else {
+        console.log('📝 Parsing as JS object literal (no quotes)');
+        // Convertir la syntaxe JavaScript object literal vers JSON
+        // Gérer les clés non-quotées: {width: 1.0} -> {"width": 1.0}
+        const jsonString = cleanValue.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*:)/g, '$1"$2"$3');
+        console.log('📝 Converted to JSON:', JSON.stringify(jsonString));
+        dimensions = JSON.parse(jsonString);
+      }
+      
+      console.log('✅ Dimensions parsées avec succès:', dimensions);
+      return dimensions;
+    } catch (error) {
+      console.error('❌ Erreur lors du parsing des dimensions:', {
+        input: dimensionsValue,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      // Retourner des dimensions par défaut selon le pattern détecté
+      if (dimensionsValue.includes('width') && dimensionsValue.includes('height')) {
+        return { width: 2.0, height: 2.0, depth: 2.0 }; // Box par défaut
+      } else if (dimensionsValue.includes('radius')) {
+        return { radius: 1.0, height: 2.0 }; // Cylinder par défaut
+      } else if (dimensionsValue.includes('tube')) {
+        return { tube: 0.4, tubularSegments: 12, radialSegments: 8 }; // Torus par défaut
+      }
+      return undefined;
+    }
+  }
+
+  // Parser les valeurs booléennes
+  private static parseBoolean(value?: string): boolean | undefined {
+    if (!value) return undefined;
+    
+    const lower = value.toLowerCase();
+    if (lower === 'true' || lower === '1') return true;
+    if (lower === 'false' || lower === '0') return false;
+    return undefined;
   }
 }
 
@@ -236,13 +483,13 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   // État pour les contrôles de rendu
   const [showArrows, setShowArrows] = useState(true);
   const [showParticles, setShowParticles] = useState(false);
-  const [showNodeText, setShowNodeText] = useState(false);
-  const [showLinkText, setShowLinkText] = useState(false);
+  const [showNodeText, setShowNodeText] = useState(true); // Afficher les labels par défaut
+  const [showLinkText, setShowLinkText] = useState(true); // Afficher les labels de liens par défaut
   const [emitParticles, setEmitParticles] = useState(false);
   const [linkCurvature, setLinkCurvature] = useState(0.2); // Intensité des courbes (0 = droite, 1 = très courbée)
-  const [linkWidth, setLinkWidth] = useState(0); // Épaisseur des liens (0 = filet minimal, 8 = épais)
+  const [linkWidth, setLinkWidth] = useState(2); // Liens visibles par défaut (2 au lieu de 0)
   const [nodeSpacing, setNodeSpacing] = useState(30); // Espacement entre nœuds (10 = serré, 100 = espacé)
-  const [nodeSize, setNodeSize] = useState(4); // Taille des nœuds (1 = petit, 12 = gros)
+  const [nodeSize, setNodeSize] = useState(6); // Taille des nœuds légèrement plus grande par défaut
   
   // États pour les accordéons
   const [controlsExpanded, setControlsExpanded] = useState(false); // Accordéon "Contrôles Visuels" fermé par défaut
@@ -518,15 +765,15 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   }, []);
 
   // Initialisation du graphique 3D
-  const initializeGraph = useCallback(() => {
+  const initializeGraph = useCallback(async () => {
     if (!graphRef.current || !isValid) return;
 
     try {
       setLoading(true);
       setError(null);
 
-      // Parser le contenu DOT
-      const graphData = DotTo3DConverter.parseDotToGraphData(dotContent);
+      // Parser le contenu DOT (async)
+      const graphData = await DotTo3DConverter.parseDotToGraphData(dotContent);
       
       if (graphData.nodes.length === 0) {
         setError('Aucun nœud détecté dans le graphique DOT');
@@ -551,39 +798,178 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       // Sauvegarder la référence pour le nettoyage
       forceGraphRef.current = graph;
 
-      // Configuration des nœuds avec texte
+      // Configuration avancée des nœuds avec support des géométries 3D
       graph
-        .nodeLabel('name')
-        .nodeVal(nodeSize) // Taille contrôlée par le slider
-        .nodeColor('color');
-        
+        .nodeLabel((node: any) => node.name || node.id || '')
+        .nodeVal((node: any) => {
+          // 1. Utiliser les attributs DOT pour la taille de base
+          let baseSize = nodeSize;
+          if (node.particleGeneration) {
+            // Taille selon generation de particules (plus génère = plus gros)
+            baseSize = Math.max(4, Math.min(12, 4 + node.particleGeneration / 50));
+          }
+          
+          // 2. Effet bloom si activé
+          if (node.bloomEffect && node.particleGeneration && node.maxParticleProcessing) {
+            const accumulation = Math.max(0, node.particleGeneration - node.maxParticleProcessing);
+            const bloomMultiplier = 1 + (accumulation / 100); // Facteur bloom
+            return baseSize * bloomMultiplier;
+          }
+          
+          return node.val || baseSize;
+        })
+        .nodeColor((node: any) => {
+          // Couleur avec effet bloom pour goulots
+          if (node.bloomEffect && node.particleGeneration && node.maxParticleProcessing) {
+            const accumulation = Math.max(0, node.particleGeneration - node.maxParticleProcessing);
+            if (accumulation > 0) {
+              // Mélange vers rouge pour les goulots
+              const intensity = Math.min(1, accumulation / 50);
+              return `hsl(${360 - intensity * 180}, 80%, ${50 + intensity * 20}%)`;
+            }
+          }
+          return node.color || '#4fc3f7';
+        })
+        // Support géométries 3D personnalisées
+        .nodeThreeObject((node: any) => {
+          if (!node.geometry) return undefined;
+          
+          // THREE est maintenant importé directement
+          if (!THREE) {
+            console.warn('THREE.js n\'est pas disponible pour les géométries personnalisées');
+            return undefined;
+          }
+          
+          let geometry, material;
+          const dimensions = node.dimensions || {};
+          
+          try {
+            // Créer la géométrie selon le type DOT
+            switch (node.geometry) {
+              case '3d-box':
+                geometry = new THREE.BoxGeometry(
+                  dimensions.width || 8,
+                  dimensions.height || 8,
+                  dimensions.depth || 8
+                );
+                break;
+              case '3d-sphere':
+                geometry = new THREE.SphereGeometry(
+                  dimensions.radius || 4,
+                  16, 16
+                );
+                break;
+              case '3d-cylinder':
+                geometry = new THREE.CylinderGeometry(
+                  dimensions.radius || 4,
+                  dimensions.radius || 4,
+                  dimensions.height || 8,
+                  16
+                );
+                break;
+              case '3d-cone':
+                geometry = new THREE.ConeGeometry(
+                  dimensions.radius || 4,
+                  dimensions.height || 8,
+                  16
+                );
+                break;
+              case '3d-torus':
+                geometry = new THREE.TorusGeometry(
+                  dimensions.radius || 4,
+                  dimensions.tube || 2,
+                  dimensions.radialSegments || 8,
+                  dimensions.tubularSegments || 16
+                );
+                break;
+              default:
+                console.warn(`Géométrie non supportée: ${node.geometry}`);
+                return undefined;
+            }
+            
+            // Matériau avec couleur et effets
+            material = new THREE.MeshLambertMaterial({
+              color: node.color || '#4fc3f7',
+              transparent: true,
+              opacity: 0.8,
+              // Effet métallique léger pour les géométries personnalisées
+              emissive: node.bloomEffect ? new THREE.Color(node.color || '#4fc3f7').multiplyScalar(0.1) : 0x000000
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            // Ajouter une légère rotation pour plus de dynamisme
+            mesh.rotation.x = Math.random() * Math.PI;
+            mesh.rotation.y = Math.random() * Math.PI;
+            
+            return mesh;
+            
+          } catch (error) {
+            console.error('Erreur lors de la création de la géométrie 3D:', error);
+            return undefined;
+          }
+        });
 
-
-      // Configuration des liens avec courbes et flèches
+      // Configuration avancée des liens avec particules personnalisées
       graph
-        .linkLabel('name')
-        .linkColor('color')
-        .linkWidth(linkWidth) // Vraie épaisseur, 0 = invisible comme dans l'exemple du framework
+        .linkLabel((link: any) => link.name || link.id || '')
+        .linkColor((link: any) => link.color || '#999999') // Utiliser la couleur DOT ou défaut
+        .linkWidth((link: any) => {
+          // Utiliser maxParticleFlow DOT ou linkWidth contrôle UI
+          if (link.maxParticleFlow && link.maxParticleFlow > 0) {
+            return Math.max(1, Math.min(8, link.maxParticleFlow / 20));
+          }
+          return Math.max(1, linkWidth); // Minimum 1 pour visibilité
+        })
         // Courbes pour les liens
         .linkCurvature(linkCurvature) // Courbure dynamique contrôlée
         .linkCurveRotation(Math.PI / 4) // Rotation de la courbe
-        // Flèches directionnelles - facteur multiplicateur avec minimum
-        .linkDirectionalArrowLength(showArrows ? Math.max(3.5, linkWidth * 3.5) : 0) // Flèches : minimum 3.5, sinon 3.5x l'épaisseur
-        .linkDirectionalArrowRelPos(1.0) // Position à 100% du lien pour toucher parfaitement
+        // Flèches directionnelles toujours visibles si activées
+        .linkDirectionalArrowLength(showArrows ? 6 : 0) // Taille fixe pour visibilité
+        .linkDirectionalArrowRelPos(1.0)
         .linkDirectionalArrowColor((link: any) => link.color || '#ff6b6b')
-        .linkDirectionalArrowResolution(8); // Résolution des flèches
-        
-      // Tooltips simples (le texte permanent est géré par Canvas)
-      graph.nodeLabel((node: any) => node.name || node.id || '')
-           .linkLabel((link: any) => link.name || link.id || '')
-           .nodeAutoColorBy('group');
+        .linkDirectionalArrowResolution(8)
+        // Style des liens selon attribut DOT
+        .linkOpacity((link: any) => {
+          if (link.style === 'dashed') return 0.6;
+          if (link.style === 'dotted') return 0.4;
+          return 0.8;
+        });
 
-      // Particules pour les liens
+      // Particules avancées basées sur les attributs DOT
       if (showParticles) {
-        graph.linkDirectionalParticles(4)
-          .linkDirectionalParticleSpeed(0.01)
-          .linkDirectionalParticleWidth(2)
-          .linkDirectionalParticleColor('#4fc3f7');
+        graph
+          .linkDirectionalParticles((link: any) => {
+            // Nombre de particules selon maxParticleFlow
+            if (link.maxParticleFlow) {
+              return Math.min(8, Math.max(1, Math.floor(link.maxParticleFlow / 10)));
+            }
+            return 2; // Défaut
+          })
+          .linkDirectionalParticleSpeed((link: any) => {
+            // Vitesse selon particleSpeed
+            if (link.particleSpeed) {
+              return link.particleSpeed * 0.01; // Facteur d'échelle
+            }
+            return 0.01; // Défaut
+          })
+          .linkDirectionalParticleWidth((link: any) => {
+            // Largeur des particules selon maxParticleFlow
+            if (link.maxParticleFlow && link.maxParticleFlow > 50) {
+              return 3; // Particules plus grosses pour flux importants
+            }
+            return 2;
+          })
+          .linkDirectionalParticleColor((link: any) => {
+            // Couleur selon intensité du flux
+            if (link.maxParticleFlow && link.maxParticleFlow > 30) {
+              return '#ff6b35'; // Orange pour flux intenses
+            }
+            return link.color || '#4fc3f7';
+          });
+      } else {
+        // Désactiver les particules
+        graph.linkDirectionalParticles(0);
       }
 
       // Émission de particules depuis les nœuds (simplifiée)
