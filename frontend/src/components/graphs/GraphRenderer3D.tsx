@@ -41,6 +41,7 @@ import {
 } from '@mui/icons-material';
 import ForceGraph3D from '3d-force-graph';
 import * as THREE from 'three';
+import SpriteText from 'three-spritetext';
 import { GraphData, GraphNode, GraphEdge } from '../../types';
 
 // Déclaration de type pour THREE.js global
@@ -487,7 +488,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   const [showLinkText, setShowLinkText] = useState(true); // Afficher les labels de liens par défaut
   const [emitParticles, setEmitParticles] = useState(false);
   const [linkCurvature, setLinkCurvature] = useState(0.2); // Intensité des courbes (0 = droite, 1 = très courbée)
-  const [linkWidth, setLinkWidth] = useState(2); // Liens visibles par défaut (2 au lieu de 0)
+  const [linkWidth, setLinkWidth] = useState(0); // Liens invisibles par défaut
   const [nodeSpacing, setNodeSpacing] = useState(30); // Espacement entre nœuds (10 = serré, 100 = espacé)
   const [nodeSize, setNodeSize] = useState(6); // Taille des nœuds légèrement plus grande par défaut
   
@@ -764,6 +765,138 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     };
   }, []);
 
+  // Callback pour linkThreeObject qui réagit aux changements de showLinkText
+  const linkLabelCallback = useCallback((link: any) => {
+    console.log('linkLabelCallback called with:', link, 'showLinkText:', showLinkText); // Debug callback call
+    if (!showLinkText) return ''; // Pas de texte si désactivé
+    // Vérifier plusieurs sources possibles pour le nom du lien
+    const linkText = link.label || link.name || link.id || '';
+    console.log('Link label result:', linkText); // Debug result
+    return linkText;
+  }, [showLinkText]);
+
+  // Callback pour nodeThreeObject qui réagit aux changements de showNodeText
+  const nodeThreeObjectCallback = useCallback((node: any) => {
+    if (!node.geometry) {
+      // Pour les nœuds sans géométrie, créer juste un SpriteText si showNodeText est activé
+      if (!showNodeText || !node.name) return undefined; // Pas de texte si désactivé
+      const spriteText = new SpriteText(node.name);
+      spriteText.textHeight = 2;
+      spriteText.color = node.color || '#4fc3f7'; // Couleur du nœud
+      // Pas de backgroundColor pour éviter le cadre noir
+      return spriteText;
+    }
+    
+    // THREE est maintenant importé directement
+    if (!THREE) {
+      console.warn('THREE.js n\'est pas disponible pour les géométries personnalisées');
+      return undefined;
+    }
+    
+    let geometry, material;
+    const dimensions = node.dimensions || {};
+    
+    try {
+      // Créer la géométrie selon le type DOT
+      switch (node.geometry) {
+        case '3d-box':
+          geometry = new THREE.BoxGeometry(
+            dimensions.width || 8,
+            dimensions.height || 8,
+            dimensions.depth || 8
+          );
+          break;
+        case '3d-sphere':
+          geometry = new THREE.SphereGeometry(
+            dimensions.radius || 4,
+            16, 16
+          );
+          break;
+        case '3d-cylinder':
+          geometry = new THREE.CylinderGeometry(
+            dimensions.radius || 4,
+            dimensions.radius || 4,
+            dimensions.height || 8,
+            16
+          );
+          break;
+        case '3d-cone':
+          geometry = new THREE.ConeGeometry(
+            dimensions.radius || 4,
+            dimensions.height || 8,
+            16
+          );
+          break;
+        case '3d-torus':
+          geometry = new THREE.TorusGeometry(
+            dimensions.radius || 4,
+            dimensions.tube || 2,
+            dimensions.radialSegments || 8,
+            dimensions.tubularSegments || 16
+          );
+          break;
+        default:
+          console.warn(`Géométrie non supportée: ${node.geometry}`);
+          return undefined;
+      }
+      
+      // Matériau avec couleur et effets
+      material = new THREE.MeshLambertMaterial({
+        color: node.color || '#4fc3f7',
+        transparent: true,
+        opacity: 0.8,
+        // Effet métallique léger pour les géométries personnalisées
+        emissive: node.bloomEffect ? new THREE.Color(node.color || '#4fc3f7').multiplyScalar(0.1) : 0x000000
+      });
+      
+      const mesh = new THREE.Mesh(geometry, material);
+      
+      // Ajouter une légère rotation pour plus de dynamisme
+      mesh.rotation.x = Math.random() * Math.PI;
+      mesh.rotation.y = Math.random() * Math.PI;
+      
+      // Créer un groupe pour contenir la géométrie et le texte
+      const group = new THREE.Group();
+      group.add(mesh);
+      
+      // Ajouter le texte avec SpriteText seulement si showNodeText est activé
+      if (showNodeText && node.name) {
+        const spriteText = new SpriteText(node.name);
+        spriteText.textHeight = 2;
+        spriteText.color = node.color || '#4fc3f7'; // Couleur du nœud
+        // Pas de backgroundColor pour éviter le cadre noir
+        
+        // Positionner le texte au-dessus de la géométrie selon le type
+        let textYOffset = 4; // Valeur par défaut augmentée
+        switch (node.geometry) {
+          case '3d-box':
+            textYOffset = (dimensions.height || 8) / 2 + 3; // +3 au lieu de +1
+            break;
+          case '3d-sphere':
+            textYOffset = (dimensions.radius || 4) + 3; // +3 au lieu de +1
+            break;
+          case '3d-cylinder':
+            textYOffset = (dimensions.height || 8) / 2 + 3; // +3 au lieu de +1
+            break;
+          case '3d-cone':
+            textYOffset = (dimensions.height || 8) / 2 + 3; // +3 au lieu de +1
+            break;
+          case '3d-torus':
+            textYOffset = (dimensions.radius || 4) + 3; // +3 au lieu de +1
+            break;
+        }
+        spriteText.position.set(0, textYOffset, 0);
+        group.add(spriteText);
+      }
+      
+      return group;
+      
+    } catch (error) {
+      console.error('Erreur lors de la création de la géométrie 3D:', error);
+      return undefined;
+    }
+  }, [showNodeText]);
+
   // Initialisation du graphique 3D
   const initializeGraph = useCallback(async () => {
     if (!graphRef.current || !isValid) return;
@@ -800,8 +933,13 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
       // Configuration avancée des nœuds avec support des géométries 3D
       graph
-        .nodeLabel((node: any) => node.name || node.id || '')
+        .nodeLabel(() => '') // Désactiver complètement le système de labels natif car nous utilisons SpriteText
         .nodeVal((node: any) => {
+          // Taille par défaut à 0 pour les nœuds (les géométries 3D personnalisées gèrent leur propre taille)
+          if (node.geometry) {
+            return 0; // Pas de sphère par défaut pour les nœuds avec géométrie personnalisée
+          }
+          
           // 1. Utiliser les attributs DOT pour la taille de base
           let baseSize = nodeSize;
           if (node.particleGeneration) {
@@ -830,97 +968,43 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           }
           return node.color || '#4fc3f7';
         })
-        // Support géométries 3D personnalisées
-        .nodeThreeObject((node: any) => {
-          if (!node.geometry) return undefined;
-          
-          // THREE est maintenant importé directement
-          if (!THREE) {
-            console.warn('THREE.js n\'est pas disponible pour les géométries personnalisées');
-            return undefined;
-          }
-          
-          let geometry, material;
-          const dimensions = node.dimensions || {};
-          
-          try {
-            // Créer la géométrie selon le type DOT
-            switch (node.geometry) {
-              case '3d-box':
-                geometry = new THREE.BoxGeometry(
-                  dimensions.width || 8,
-                  dimensions.height || 8,
-                  dimensions.depth || 8
-                );
-                break;
-              case '3d-sphere':
-                geometry = new THREE.SphereGeometry(
-                  dimensions.radius || 4,
-                  16, 16
-                );
-                break;
-              case '3d-cylinder':
-                geometry = new THREE.CylinderGeometry(
-                  dimensions.radius || 4,
-                  dimensions.radius || 4,
-                  dimensions.height || 8,
-                  16
-                );
-                break;
-              case '3d-cone':
-                geometry = new THREE.ConeGeometry(
-                  dimensions.radius || 4,
-                  dimensions.height || 8,
-                  16
-                );
-                break;
-              case '3d-torus':
-                geometry = new THREE.TorusGeometry(
-                  dimensions.radius || 4,
-                  dimensions.tube || 2,
-                  dimensions.radialSegments || 8,
-                  dimensions.tubularSegments || 16
-                );
-                break;
-              default:
-                console.warn(`Géométrie non supportée: ${node.geometry}`);
-                return undefined;
-            }
-            
-            // Matériau avec couleur et effets
-            material = new THREE.MeshLambertMaterial({
-              color: node.color || '#4fc3f7',
-              transparent: true,
-              opacity: 0.8,
-              // Effet métallique léger pour les géométries personnalisées
-              emissive: node.bloomEffect ? new THREE.Color(node.color || '#4fc3f7').multiplyScalar(0.1) : 0x000000
-            });
-            
-            const mesh = new THREE.Mesh(geometry, material);
-            
-            // Ajouter une légère rotation pour plus de dynamisme
-            mesh.rotation.x = Math.random() * Math.PI;
-            mesh.rotation.y = Math.random() * Math.PI;
-            
-            return mesh;
-            
-          } catch (error) {
-            console.error('Erreur lors de la création de la géométrie 3D:', error);
-            return undefined;
-          }
-        });
+        .nodeThreeObject(nodeThreeObjectCallback);
 
       // Configuration avancée des liens avec particules personnalisées
       graph
-        .linkLabel((link: any) => link.name || link.id || '')
-        .linkColor((link: any) => link.color || '#999999') // Utiliser la couleur DOT ou défaut
-        .linkWidth((link: any) => {
-          // Utiliser maxParticleFlow DOT ou linkWidth contrôle UI
-          if (link.maxParticleFlow && link.maxParticleFlow > 0) {
-            return Math.max(1, Math.min(8, link.maxParticleFlow / 20));
-          }
-          return Math.max(1, linkWidth); // Minimum 1 pour visibilité
+        // Utiliser la méthode officielle pour les labels de liens
+        .linkThreeObjectExtend(true) // Étendre les liens au lieu de les remplacer
+        .linkThreeObject((link: any) => {
+          console.log('linkThreeObject called with:', link, 'showLinkText:', showLinkText);
+          if (!showLinkText) return null; // Pas de label quand désactivé
+          
+          const linkText = link.name || link.label || '';
+          if (!linkText) return null;
+          
+          // Créer un SpriteText pour le label (comme dans l'exemple officiel)
+          const sprite = new SpriteText(linkText);
+          sprite.color = link.color || '#999999';
+          sprite.textHeight = 1.5;
+          // Pas de backgroundColor pour éviter le cadre noir
+          
+          console.log('Created link sprite for:', linkText);
+          return sprite;
         })
+        .linkPositionUpdate((sprite: any, { start, end }: any) => {
+          if (!sprite || !showLinkText) return;
+          
+          // Calculer la position au milieu du lien (comme dans l'exemple officiel)
+          const middlePos = {
+            x: start.x + (end.x - start.x) / 2,
+            y: start.y + (end.y - start.y) / 2,
+            z: start.z + (end.z - start.z) / 2
+          };
+          
+          // Positionner le sprite au milieu
+          Object.assign(sprite.position, middlePos);
+        })
+        .linkColor((link: any) => link.color || '#999999') // Utiliser la couleur DOT ou défaut
+        .linkWidth(linkWidth) // Utiliser uniquement la valeur du contrôle
         // Courbes pour les liens
         .linkCurvature(linkCurvature) // Courbure dynamique contrôlée
         .linkCurveRotation(Math.PI / 4) // Rotation de la courbe
@@ -996,9 +1080,8 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           document.body.style.cursor = node ? 'pointer' : 'default';
         })
         .onLinkHover((link: any) => {
-          if (link && showLinkText) {
-            graph.linkLabel(() => link.name || '');
-          }
+          // Hover effect pour les liens (peut être amélioré plus tard)
+          document.body.style.cursor = link ? 'pointer' : 'default';
         });
 
       // Laisser le framework 3d-force-graph gérer l'espacement naturellement
@@ -1102,6 +1185,19 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     updateNodeSize();
   }, [updateNodeSize]);
 
+  // Effet pour recréer le graphique quand showNodeText change
+  useEffect(() => {
+    if (forceGraphRef.current && !isInitialLoad) {
+      // Sauvegarder les données actuelles
+      const currentData = forceGraphRef.current.graphData();
+      
+      // Reconfigurer nodeThreeObject avec la nouvelle valeur de showNodeText
+      forceGraphRef.current
+        .nodeThreeObject(nodeThreeObjectCallback)
+        .graphData(currentData); // Re-appliquer les données pour forcer le rendu
+    }
+  }, [showNodeText, nodeThreeObjectCallback, isInitialLoad]);
+
   // État pour les overlays de texte
   const [textOverlays, setTextOverlays] = useState<Array<{id: string, x: number, y: number, text: string, type: 'node' | 'link'}>>([]);
   
@@ -1111,24 +1207,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     
     const overlays: Array<{id: string, x: number, y: number, text: string, type: 'node' | 'link'}> = [];
     
-    // Générer TOUS les overlays de nœuds (le filtrage se fait au rendu)
-    currentGraphData.nodes.forEach((node: ForceGraphNode) => {
-      const label = node.name || node.id || '';
-      if (label && node.x !== undefined && node.y !== undefined) {
-        // Projection 3D vers 2D (approximation)
-        const screenPos = forceGraphRef.current!.graph2ScreenCoords ? 
-          forceGraphRef.current!.graph2ScreenCoords(node.x, node.y, node.z || 0) :
-          { x: node.x * 10 + dimensions.width/2, y: -node.y * 10 + dimensions.height/2 };
-        
-        overlays.push({
-          id: `node-${node.id}`,
-          x: screenPos.x,
-          y: screenPos.y - 20, // Au-dessus du nœud
-          text: label,
-          type: 'node'
-        });
-      }
-    });
+    // Les overlays de nœuds sont supprimés car nous utilisons SpriteText pour les noms des nœuds
     
     // Générer TOUS les overlays de liens (le filtrage se fait au rendu)
     currentGraphData.links.forEach((link: ForceGraphLink, index: number) => {
@@ -1159,6 +1238,34 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     
     setTextOverlays(overlays);
   }, [currentGraphData, dimensions.width, dimensions.height]);
+  
+  // Effet pour reconfigurer les labels de liens quand showLinkText change
+  useEffect(() => {
+    if (forceGraphRef.current && !isInitialLoad) {
+      console.log('Reconfiguring link labels due to showLinkText change:', showLinkText);
+      
+      const currentData = forceGraphRef.current.graphData();
+      
+      // Reconfigurer linkThreeObject
+      forceGraphRef.current
+        .linkThreeObject((link: any) => {
+          console.log('useEffect linkThreeObject called with:', link, 'showLinkText:', showLinkText);
+          if (!showLinkText) return null;
+          
+          const linkText = link.name || link.label || '';
+          if (!linkText) return null;
+          
+          const sprite = new SpriteText(linkText);
+          sprite.color = link.color || '#999999';
+          sprite.textHeight = 1.5;
+          // Pas de backgroundColor pour éviter le cadre noir
+          
+          console.log('useEffect created link sprite for:', linkText);
+          return sprite;
+        })
+        .graphData(currentData); // Re-appliquer les données
+    }
+  }, [showLinkText, isInitialLoad]);
   
   // Mise à jour des overlays quand le graphique bouge
   useEffect(() => {
@@ -1611,33 +1718,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         }}
       />
       
-      {/* Overlays de texte permanent */}
-      {textOverlays
-        .filter(overlay => 
-          (overlay.type === 'node' && showNodeText) || 
-          (overlay.type === 'link' && showLinkText)
-        )
-        .map((overlay) => (
-        <Typography
-          key={overlay.id}
-          sx={{
-            position: 'absolute',
-            left: `${overlay.x}px`,
-            top: `${overlay.y}px`,
-            color: overlay.type === 'node' ? '#ffffff' : '#cccccc',
-            fontSize: overlay.type === 'node' ? '12px' : '10px',
-            fontFamily: 'Arial, sans-serif',
-            fontWeight: 'bold',
-            textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-            pointerEvents: 'none',
-            userSelect: 'none',
-            zIndex: 50,
-            transform: 'translate(-50%, -50%)'
-          }}
-        >
-          {overlay.text}
-        </Typography>
-      ))}
+      {/* Les labels de liens sont maintenant gérés par SpriteText avec linkThreeObjectExtend */}
 
       {/* Indicateur de chargement */}
       {loading && (
