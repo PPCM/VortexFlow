@@ -43,7 +43,7 @@
     "helmet": "^7.0.0",
     "cors": "^2.8.5",
     "express-rate-limit": "^6.8.1",
-    "express-validator": "^7.0.1",
+    "express-validator": "^7.3.1",
     "dotenv": "^16.3.1",
     "winston": "^3.10.0",
     "graphology": "^0.25.1",
