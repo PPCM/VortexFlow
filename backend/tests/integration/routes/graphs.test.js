@@ -9,9 +9,6 @@ const mockGraphFindByPk = jest.fn();
 const mockGraphCreate = jest.fn();
 const mockGraphVersionCreateFromGraph = jest.fn();
 
-// Capture instances mutably so tests can swap them per case.
-let lastGraphInstance = null;
-
 jest.mock('../../../src/models', () => ({
   Graph: {
     findAndCountAll: (...args) => mockGraphFindAndCountAll(...args),
@@ -101,7 +98,6 @@ beforeEach(() => {
   mockGraphFindByPk.mockReset();
   mockGraphCreate.mockReset();
   mockGraphVersionCreateFromGraph.mockReset().mockResolvedValue(undefined);
-  lastGraphInstance = null;
 });
 
 // ----------------------------------------------------------------------------

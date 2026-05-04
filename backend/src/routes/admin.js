@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { validateSession, requireAdmin, logActivity } = require('../middleware/auth');
+const { validateSession, requireAdmin } = require('../middleware/auth');
 const { User, Graph, SimulationSession } = require('../models');
 const { Op } = require('sequelize');
 const logger = require('../utils/logger');
@@ -831,11 +831,9 @@ router.get('/activity', async (req, res) => {
       userId = '',
       action = '',
       startDate = '',
-      endDate = '',
-      sortOrder = 'DESC'
+      endDate = ''
     } = req.query;
 
-    const offset = (page - 1) * limit;
     const whereClause = {};
 
     // Filtres

@@ -2,7 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { User } = require('../models');
 const { authRateLimit, validateSession, logActivity } = require('../middleware/auth');
-const { asyncHandler, AppError } = require('../middleware/errorHandler');
+const { asyncHandler } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');
 
 const router = express.Router();

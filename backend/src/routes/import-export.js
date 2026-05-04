@@ -15,7 +15,6 @@ const dotValidator = require('../utils/dotValidator');
 const logger = require('../utils/logger');
 const archiver = require('archiver');
 const path = require('path');
-const fs = require('fs').promises;
 
 const router = express.Router();
 

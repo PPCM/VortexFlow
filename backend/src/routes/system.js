@@ -87,7 +87,6 @@ router.get('/stats',
     const now = new Date();
     const last24h = new Date(now - 24 * 60 * 60 * 1000);
     const last7d = new Date(now - 7 * 24 * 60 * 60 * 1000);
-    const last30d = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
     const [
       totalUsers,

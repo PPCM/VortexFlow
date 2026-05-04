@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
-const { Graph, GraphVersion, GraphShare, User, SimulationSession } = require('../models');
-const { requireGraphAccess, requireEditor, requireAdmin, validateSession, logActivity } = require('../middleware/auth');
+const { Graph, GraphVersion, GraphShare, User } = require('../models');
+const { requireGraphAccess, requireEditor, validateSession, logActivity } = require('../middleware/auth');
 const dotValidator = require('../utils/dotValidator');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');
@@ -867,11 +867,37 @@ router.post('/parse-dot',
         style: edge.attributes.style || 'solid'
       }));
       
+      // Extraire les attributs globaux depuis l'AST
+      const globalSettings = {};
+      if (parseResult.ast.attributes) {
+        // Attributs globaux supportés
+        const globalKeys = ['defaultNodeSize', 'autoColors', 'autoResize', 'particlesEnabled', 'bloomEffect'];
+        
+        for (const key of globalKeys) {
+          if (parseResult.ast.attributes[key] !== undefined) {
+            let value = parseResult.ast.attributes[key];
+            
+            // Conversion des types
+            if (key === 'defaultNodeSize') {
+              value = parseFloat(value) || 6;
+            } else if (['autoColors', 'autoResize', 'particlesEnabled', 'bloomEffect'].includes(key)) {
+              value = ['true', '1', 'yes', 'on'].includes(String(value).toLowerCase());
+            }
+            
+            globalSettings[key] = value;
+          }
+        }
+      }
+      
       console.log(`🎆 Backend DOT parsing successful: ${nodes.length} nodes, ${links.length} links`);
+      if (Object.keys(globalSettings).length > 0) {
+        console.log('🌐 Global settings extracted:', globalSettings);
+      }
       
       res.json({
         nodes,
         links,
+        globalSettings: Object.keys(globalSettings).length > 0 ? globalSettings : undefined,
         metadata: parseResult.metadata
       });
       

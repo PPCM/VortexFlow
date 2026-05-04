@@ -271,9 +271,7 @@ class DotValidator {
     
     console.log('[BACKEND DEBUG] Contenu nettoyé \u00e0 parser:', cleanContent);
     
-    // Approche: parser toutes les déclarations de nœuds, puis filtrer celles qui ne font pas partie d'arêtes
-    const edgeOperators = result.metadata.type === 'digraph' ? ['->', '<-'] : ['--'];
-    
+    // Approche: parser toutes les déclarations de nœuds, puis filtrer celles qui ne font pas partie d'arêtes.
     // D'abord, identifier toutes les positions des arêtes pour les exclure
     // Utiliser la même regex que pour parser les arêtes, mais pour capturer les positions
     const nodeEdgePattern = result.metadata.type === 'digraph' 

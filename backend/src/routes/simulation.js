@@ -1,10 +1,9 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
-const { Graph, SimulationSession, User } = require('../models');
-const { requireGraphAccess, requireEditor, logActivity } = require('../middleware/auth');
+const { Graph, SimulationSession } = require('../models');
+const { requireEditor, logActivity } = require('../middleware/auth');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');
-const { Op } = require('sequelize');
 
 const router = express.Router();
 
@@ -614,7 +613,8 @@ router.post('/validate-config',
       });
     }
 
-    const { config, dotCode } = req.body;
+    // dotCode is validated upstream and re-destructured by the TODO below.
+    const { config, dotCode: _dotCode } = req.body;
 
     // Basic config validation
     const validationErrors = [];

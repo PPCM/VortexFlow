@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
 const { User, Graph, SimulationSession } = require('../models');
-const { requireAdmin, requireRole, logActivity } = require('../middleware/auth');
+const { requireAdmin, logActivity } = require('../middleware/auth');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');
 const { Op } = require('sequelize');
@@ -498,7 +498,7 @@ router.get('/:id/activity',
     }
 
     const { id } = req.params;
-    const { page = 1, limit = 20 } = req.query;
+    const { limit = 20 } = req.query;
 
     const user = await User.findByPk(id);
     if (!user) {
