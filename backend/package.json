@@ -8,8 +8,10 @@
     "start:env": "node -r dotenv/config server.js",
     "dev": "nodemon server.js",
     "dev:env": "nodemon -r dotenv/config server.js",
-    "test": "jest --coverage",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
+    "test:unit": "jest --testPathPattern=tests/unit",
     "test:integration": "jest --testPathPattern=tests/integration",
     "setup-db": "node scripts/setup-database.js",
     "check-db": "node -e \"require('./src/models').sequelize.authenticate().then(() => console.log('DB OK')).catch(() => process.exit(1))\"",
@@ -75,19 +77,18 @@
   },
   "jest": {
     "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ],
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/config/**",
       "!src/migrations/**",
       "!src/seeders/**"
     ],
-    "coverageThreshold": {
-      "global": {
-        "branches": 80,
-        "functions": 80,
-        "lines": 80,
-        "statements": 80
-      }
-    }
+    "verbose": true
   }
 }

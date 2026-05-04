@@ -266,30 +266,71 @@ class DotValidator {
     }
 
     // ÉTAPE 2: Parser les attributs des nœuds et enrichir les nœuds existants
+    // Il faut éviter de confondre les attributs des nœuds avec ceux des liens
+    // Utiliser une approche qui ne dépend pas des sauts de ligne
+    
+    console.log('[BACKEND DEBUG] Contenu nettoyé \u00e0 parser:', cleanContent);
+    
+    // Approche: parser toutes les déclarations de nœuds, puis filtrer celles qui ne font pas partie d'arêtes
+    const edgeOperators = result.metadata.type === 'digraph' ? ['->', '<-'] : ['--'];
+    
+    // D'abord, identifier toutes les positions des arêtes pour les exclure
+    // Utiliser la même regex que pour parser les arêtes, mais pour capturer les positions
+    const nodeEdgePattern = result.metadata.type === 'digraph' 
+      ? /([A-Za-z]\w*)\s*->\s*([A-Za-z]\w*)\s*(?:\[([^\]]*)\])?/g
+      : /([A-Za-z]\w*)\s*--\s*([A-Za-z]\w*)\s*(?:\[([^\]]*)\])?/g;
+    
+    const edgeRanges = [];
+    let nodeEdgeMatch;
+    nodeEdgePattern.lastIndex = 0;
+    
+    while ((nodeEdgeMatch = nodeEdgePattern.exec(cleanContent)) !== null) {
+      const range = {
+        start: nodeEdgeMatch.index,
+        end: nodeEdgeMatch.index + nodeEdgeMatch[0].length
+      };
+      console.log(`[BACKEND DEBUG] Plage arête détectée: "${nodeEdgeMatch[0]}" positions ${range.start}-${range.end}`);
+      edgeRanges.push(range);
+    }
+    
+    // Maintenant parser les nœuds avec attributs en excluant ceux dans les arêtes
     const nodeWithAttrsRegex = /([A-Za-z]\w*)\s*\[([^\]]*)\]/g;
     let nodeAttrMatch;
-    nodeWithAttrsRegex.lastIndex = 0; // Reset regex
     
     while ((nodeAttrMatch = nodeWithAttrsRegex.exec(cleanContent)) !== null) {
       const nodeId = nodeAttrMatch[1];
       const attrsString = nodeAttrMatch[2];
+      const matchStart = nodeAttrMatch.index;
+      const matchEnd = nodeAttrMatch.index + nodeAttrMatch[0].length;
       
-      // Filtrer les mots-clés DOT
-      if (dotKeywords.has(nodeId.toLowerCase())) {
-        continue;
-      }
+      // Vérifier si cette déclaration fait partie d'une arête
+      const isPartOfEdge = edgeRanges.some(range => 
+        matchStart >= range.start && matchEnd <= range.end
+      );
       
-      // Mettre à jour ou créer le nœud
-      if (nodeMap.has(nodeId)) {
-        // Enrichir nœud existant
-        const existingNode = nodeMap.get(nodeId);
-        existingNode.attributes = { ...existingNode.attributes, ...this.parseAttributes(attrsString) };
-      } else if (connectedNodeIds.has(nodeId)) {
-        // Créer nœud seulement s'il est connecté
-        nodeMap.set(nodeId, {
-          id: nodeId,
-          attributes: this.parseAttributes(attrsString)
-        });
+      // Si ce n'est pas partie d'une arête, traiter comme attributs de nœud
+      if (!isPartOfEdge) {
+        // Filtrer les mots-clés DOT
+        if (dotKeywords.has(nodeId.toLowerCase())) {
+          continue;
+        }
+        
+        console.log(`[BACKEND DEBUG] Traitement attributs nœud ${nodeId}: "${attrsString}"`);
+        
+        // Mettre à jour ou créer le nœud
+        if (nodeMap.has(nodeId)) {
+          // Enrichir nœud existant
+          const existingNode = nodeMap.get(nodeId);
+          existingNode.attributes = { ...existingNode.attributes, ...this.parseAttributes(attrsString) };
+        } else if (connectedNodeIds.has(nodeId)) {
+          // Créer nœud seulement s'il est connecté
+          nodeMap.set(nodeId, {
+            id: nodeId,
+            attributes: this.parseAttributes(attrsString)
+          });
+        }
+      } else {
+        console.log(`[BACKEND DEBUG] Ignoré car partie d'arête: ${nodeId} [${attrsString}]`);
       }
     }
 
@@ -299,6 +340,14 @@ class DotValidator {
 
     console.log('[BACKEND] Nœuds traités:', Array.from(nodeMap.keys()));
     console.log('[BACKEND] Liens créés:', result.metadata.edgeCount);
+    console.log('[BACKEND DEBUG] Détail des nœuds:');
+    result.ast.nodes.forEach(node => {
+      console.log(`  - Nœud ${node.id}: label="${node.attributes.label}", attributes:`, node.attributes);
+    });
+    console.log('[BACKEND DEBUG] Détail des liens:');
+    result.ast.edges.forEach(edge => {
+      console.log(`  - Lien ${edge.from}->${edge.to}: label="${edge.attributes.label}", attributes:`, edge.attributes);
+    });
 
     // Parse subgraphs
     const subgraphPattern = /subgraph\s+(\w+)?\s*\{([^}]*)\}/g;
@@ -309,6 +358,16 @@ class DotValidator {
         content: subgraphMatch[2]
       });
       result.metadata.subgraphCount++;
+    }
+
+    // ÉTAPE 4: Extraire les attributs globaux de type "graph [...]"
+    const globalGraphPattern = /graph\s*\[([^\]]+)\]/gi;
+    let globalMatch;
+    while ((globalMatch = globalGraphPattern.exec(dotCode)) !== null) {
+      const globalAttrs = this.parseAttributes(globalMatch[1]);
+      // Fusionner avec les attributs existants
+      result.ast.attributes = { ...result.ast.attributes, ...globalAttrs };
+      console.log('[BACKEND] Attributs globaux trouvés:', globalAttrs);
     }
 
     return result;
@@ -573,10 +632,10 @@ class DotValidator {
   validate3DAttributes(dotCode, attribute) {
     const result = { warnings: [] };
     
-    // Enhanced regex to handle complex values including JSON objects with nested braces
-    // Pattern matches: attribute = "value" or attribute = {complex: value}
+    // Pattern matches: attribute = "value", attribute = {complex: value}, or attribute = bare-token.
+    // Note: backslashes must be doubled so `\s` reaches the RegExp constructor intact.
     const pattern = new RegExp(
-      `${attribute}\s*=\s*(?:"([^"]*)"|({[^}]*})|([^,\];\s]+))`,
+      `${attribute}\\s*=\\s*(?:"([^"]*)"|(\\{[^}]*\\})|([^,\\];\\s]+))`,
       'g'
     );
     let match;
