@@ -686,7 +686,7 @@ class DotValidator {
         case 'maxParticleProcessing':
         case 'particleSpeed':
         case 'maxParticleFlow':
-        case 'defaultNodeSize':
+        case 'defaultNodeSize': {
           const numValue = parseFloat(value);
           if (isNaN(numValue) || numValue < 0) {
             result.warnings.push(`Invalid ${attribute}: "${value}" (must be non-negative number)`);
@@ -695,6 +695,7 @@ class DotValidator {
             result.warnings.push(`Very high particle speed: ${numValue} (may impact performance)`);
           }
           break;
+        }
 
         case 'autoResize':
         case 'bloomEffect':

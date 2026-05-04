@@ -3,6 +3,7 @@ const router = express.Router();
 const dotValidator = require('../utils/dotValidator');
 const asyncHandler = require('../middleware/asyncHandler');
 const { User } = require('../models');
+const logger = require('../utils/logger');
 const os = require('os');
 
 /**
@@ -176,6 +177,7 @@ router.post('/parse-dot',
       }
       
       // Convertir l'AST vers le format attendu par le frontend
+      console.log('[ROUTE DEBUG] AST nodes reçus:', JSON.stringify(parseResult.ast.nodes, null, 2));
       const nodes = parseResult.ast.nodes.map(node => ({
         id: node.id,
         label: node.attributes.label || node.id,
@@ -201,11 +203,37 @@ router.post('/parse-dot',
         style: edge.attributes.style || 'solid'
       }));
       
+      // Extraire les attributs globaux depuis l'AST
+      const globalSettings = {};
+      if (parseResult.ast.attributes) {
+        // Attributs globaux supportés
+        const globalKeys = ['defaultNodeSize', 'autoColors', 'autoResize', 'particlesEnabled', 'bloomEffect'];
+        
+        for (const key of globalKeys) {
+          if (parseResult.ast.attributes[key] !== undefined) {
+            let value = parseResult.ast.attributes[key];
+            
+            // Conversion des types
+            if (key === 'defaultNodeSize') {
+              value = parseFloat(value) || 6;
+            } else if (['autoColors', 'autoResize', 'particlesEnabled', 'bloomEffect'].includes(key)) {
+              value = ['true', '1', 'yes', 'on'].includes(String(value).toLowerCase());
+            }
+            
+            globalSettings[key] = value;
+          }
+        }
+      }
+      
       console.log(`🎆 Backend DOT parsing successful: ${nodes.length} nodes, ${links.length} links`);
+      if (Object.keys(globalSettings).length > 0) {
+        console.log('🌐 Global settings extracted:', globalSettings);
+      }
       
       res.json({
         nodes,
         links,
+        globalSettings: Object.keys(globalSettings).length > 0 ? globalSettings : undefined,
         metadata: parseResult.metadata
       });
       

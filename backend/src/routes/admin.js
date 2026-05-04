@@ -511,30 +511,30 @@ router.post('/users/bulk-action', async (req, res) => {
           }
         });
         break;
-      case 'permanent_delete':
+      case 'permanent_delete': {
         // Empêcher la suppression des derniers admins
-        const adminCount = await User.count({ 
-          where: { 
-            role: 'admin', 
+        const adminCount = await User.count({
+          where: {
+            role: 'admin',
             is_active: true,
             id: { [Op.not]: user_ids }
-          } 
+          }
         });
-        
+
         const adminToDeleteCount = await User.count({
           where: {
             role: 'admin',
             id: user_ids
           }
         });
-        
+
         if (adminCount === 0 && adminToDeleteCount > 0) {
           return res.status(400).json({
             success: false,
             message: 'Cannot delete all active admin users'
           });
         }
-        
+
         affectedCount = await User.destroy({
           where: {
             id: user_ids
@@ -542,6 +542,7 @@ router.post('/users/bulk-action', async (req, res) => {
         });
         message = 'Users permanently deleted';
         break;
+      }
       default:
         return res.status(400).json({
           success: false,
