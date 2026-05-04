@@ -2,6 +2,12 @@
 # Application web de visualisation 3D de graphiques DOT
 
 # =====================================
+# Claude Code (instructions locales)
+# =====================================
+CLAUDE.md
+CLAUDE.local.md
+
+# =====================================
 # Variables d'environnement et secrets
 # =====================================
 .env
