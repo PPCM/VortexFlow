@@ -35,6 +35,13 @@ jest.mock('../common/LoadingPage', () => ({
   default: ({ message }: any) => <div data-testid="loading">{message}</div>,
 }));
 
+// GraphRenderer3D pulls 3d-force-graph + three.js (ESM, requires Canvas/WebGL).
+// Stub it so the Viewer test stays hermetic.
+jest.mock('./GraphRenderer3D', () => ({
+  __esModule: true,
+  default: () => <div data-testid="renderer-3d" />,
+}));
+
 import GraphViewer from './GraphViewer';
 
 const baseCtx = (overrides: any = {}) => ({

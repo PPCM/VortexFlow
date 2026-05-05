@@ -55,6 +55,7 @@ import { useWebSocket } from '../../services/websocket';
 import { usePermissions } from '../../context/AuthContext';
 import { SimulationConfig } from '../../types';
 import LoadingPage from '../common/LoadingPage';
+import GraphRenderer3D from './GraphRenderer3D';
 
 const GraphViewer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -424,27 +425,19 @@ const GraphViewer: React.FC = () => {
             overflow: 'hidden',
           }}
         >
-          {/* Placeholder pour Three.js */}
-          <Box sx={{ textAlign: 'center' }}>
-            <ThreeDRotation sx={{ fontSize: 64, color: 'rgba(255,255,255,0.3)', mb: 2 }} />
-            <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-              Visualisation 3D
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-              Intégration Three.js + 3d-force-graph à implémenter
-            </Typography>
-            
-            {/* Statistiques du graphique */}
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 3 }}>
-              <Chip
-                label={`${(currentGraph.data?.nodes || []).length} nœuds`}
-                sx={{ backgroundColor: 'rgba(0,255,136,0.2)', color: '#00ff88' }}
-              />
-              <Chip
-                label={`${(currentGraph.data?.edges || []).length} arêtes`}
-                sx={{ backgroundColor: 'rgba(255,107,53,0.2)', color: '#ff6b35' }}
-              />
-            </Box>
+          {/* Vrai rendu 3D — partage le même composant que l'onglet APERÇU 3D
+              de l'éditeur. Backend renvoie le DOT sous .dotCode (camelCase),
+              avec un fallback sur .dot_code par sécurité. */}
+          <Box sx={{ width: '100%', height: '100%' }}>
+            <GraphRenderer3D
+              dotContent={
+                (currentGraph as any).dotCode
+                || (currentGraph as any).dot_code
+                || (currentGraph as any).dot_content
+                || ''
+              }
+              isValid={true}
+            />
           </Box>
         </Paper>
         
