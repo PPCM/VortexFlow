@@ -89,7 +89,7 @@ describe('GET /api/dashboard/stats', () => {
 });
 
 describe('GET /api/dashboard/recent-graphs', () => {
-  test('returns user graphs ordered by updated_at', async () => {
+  test('returns user graphs ordered by updatedAt', async () => {
     mockGraphFindAll.mockResolvedValue([{ id: 'g1' }, { id: 'g2' }]);
     const app = buildTestApp(dashboardRoutes, '/api/dashboard', { user: TEST_USER });
     const res = await request(app).get('/api/dashboard/recent-graphs');
@@ -98,7 +98,7 @@ describe('GET /api/dashboard/recent-graphs', () => {
     expect(res.body.data).toHaveLength(2);
     const args = mockGraphFindAll.mock.calls[0][0];
     expect(args.where).toEqual({ user_id: TEST_USER.id });
-    expect(args.order).toEqual([['updated_at', 'DESC']]);
+    expect(args.order).toEqual([['updatedAt', 'DESC']]);
     expect(args.limit).toBe(5); // default
   });
 

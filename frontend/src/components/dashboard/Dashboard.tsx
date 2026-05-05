@@ -182,7 +182,7 @@ const Dashboard: React.FC = () => {
       {/* En-tête */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-          Bonjour, {user?.username} 👋
+          Bonjour, {(user as any)?.fullName || (user as any)?.firstName || user?.email || 'utilisateur'} 👋
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Voici un aperçu de votre activité VortexFlow

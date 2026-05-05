@@ -113,7 +113,7 @@ router.get('/',
       ],
       limit: parseInt(limit),
       offset,
-      order: [['created_at', 'DESC']],
+      order: [['createdAt', 'DESC']],
       distinct: true
     });
 
@@ -162,16 +162,16 @@ router.get('/:id',
         {
           model: Graph,
           as: 'graphs',
-          attributes: ['id', 'title', 'is_public', 'view_count', 'created_at'],
+          attributes: ['id', 'title', 'is_public', 'view_count', 'createdAt'],
           limit: 10,
-          order: [['created_at', 'DESC']]
+          order: [['createdAt', 'DESC']]
         },
         {
           model: SimulationSession,
           as: 'simulationSessions',
-          attributes: ['id', 'session_name', 'status', 'duration', 'created_at'],
+          attributes: ['id', 'session_name', 'status', 'duration', 'createdAt'],
           limit: 10,
-          order: [['created_at', 'DESC']]
+          order: [['createdAt', 'DESC']]
         }
       ]
     });
@@ -388,7 +388,7 @@ router.get('/dashboard/stats',
       User.findAll({
         attributes: { exclude: ['password_hash'] },
         limit: 5,
-        order: [['created_at', 'DESC']]
+        order: [['createdAt', 'DESC']]
       }),
       Graph.count(),
       Graph.count({ where: { is_public: true } }),
@@ -509,14 +509,14 @@ router.get('/:id/activity',
     const [graphs, sessions] = await Promise.all([
       Graph.findAll({
         where: { user_id: id },
-        attributes: ['id', 'title', 'created_at', 'updated_at'],
-        order: [['updated_at', 'DESC']],
+        attributes: ['id', 'title', 'createdAt', 'updatedAt'],
+        order: [['updatedAt', 'DESC']],
         limit: 10
       }),
       SimulationSession.findAll({
         where: { user_id: id },
-        attributes: ['id', 'session_name', 'status', 'duration', 'created_at'],
-        order: [['created_at', 'DESC']],
+        attributes: ['id', 'session_name', 'status', 'duration', 'createdAt'],
+        order: [['createdAt', 'DESC']],
         limit: 10
       })
     ]);

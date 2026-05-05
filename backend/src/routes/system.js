@@ -315,7 +315,7 @@ router.post('/cleanup',
         for (const graph of graphs) {
           const versions = await GraphVersion.findAll({
             where: { graph_id: graph.id },
-            order: [['created_at', 'DESC']],
+            order: [['createdAt', 'DESC']],
             offset: 10 // Keep latest 10 versions
           });
           

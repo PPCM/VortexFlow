@@ -16,6 +16,13 @@ nohup.out
 **/*.log
 
 # =====================================
+# Docker overrides locaux (config par machine)
+# =====================================
+docker-compose.override.yml
+docker-compose.override.yaml
+backend/.env.backup-*
+
+# =====================================
 # Variables d'environnement et secrets
 # =====================================
 .env

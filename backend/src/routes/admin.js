@@ -578,7 +578,7 @@ router.get('/graphs', async (req, res) => {
       search = '',
       userId = '',
       isPublic = '',
-      sortBy = 'created_at',
+      sortBy = 'createdAt',
       sortOrder = 'DESC'
     } = req.query;
 
@@ -712,7 +712,7 @@ router.get('/simulations', async (req, res) => {
       status = '',
       userId = '',
       graphId = '',
-      sortBy = 'created_at',
+      sortBy = 'createdAt',
       sortOrder = 'DESC'
     } = req.query;
 

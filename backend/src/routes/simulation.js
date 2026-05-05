@@ -57,7 +57,7 @@ router.get('/sessions',
       ],
       limit: parseInt(limit),
       offset,
-      order: [['created_at', 'DESC']],
+      order: [['createdAt', 'DESC']],
       distinct: true
     });
 

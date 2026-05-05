@@ -82,7 +82,7 @@ router.get('/recent-graphs',
 
     const graphs = await Graph.findAll({
       where: { user_id: req.user.id },
-      order: [['updated_at', 'DESC']],
+      order: [['updatedAt', 'DESC']],
       limit,
       include: [
         {
