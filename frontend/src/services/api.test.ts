@@ -93,12 +93,20 @@ describe('Auth methods', () => {
 });
 
 describe('Graph methods', () => {
-  test('getGraphs forwards filters as query params', async () => {
-    mockAxiosClient.get.mockResolvedValue({ data: { success: true, data: [] } });
-    await apiService.getGraphs({ page: 2, limit: 10 } as any);
+  test('getGraphs forwards filters as query params and unwraps {graphs, pagination}', async () => {
+    mockAxiosClient.get.mockResolvedValue({
+      data: {
+        graphs: [{ id: 1 }, { id: 2 }],
+        pagination: { page: 2, limit: 10, total: 2, pages: 1 },
+      },
+    });
+    const r = await apiService.getGraphs({ page: 2, limit: 10 } as any);
     expect(mockAxiosClient.get).toHaveBeenCalledWith('/graphs', {
       params: { page: 2, limit: 10 },
     });
+    expect(r.success).toBe(true);
+    expect(r.data.data).toHaveLength(2);
+    expect(r.data.total).toBe(2);
   });
 
   test('getGraph hits /graphs/:id', async () => {
@@ -128,7 +136,7 @@ describe('Graph methods', () => {
   test('duplicateGraph posts the new name to /:id/duplicate', async () => {
     mockAxiosClient.post.mockResolvedValue({ data: { success: true } });
     await apiService.duplicateGraph(3, 'Copy');
-    expect(mockAxiosClient.post).toHaveBeenCalledWith('/graphs/3/duplicate', { name: 'Copy' });
+    expect(mockAxiosClient.post).toHaveBeenCalledWith('/graphs/3/duplicate', { title: 'Copy' });
   });
 });
 

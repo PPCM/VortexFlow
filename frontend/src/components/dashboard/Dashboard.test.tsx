@@ -50,11 +50,11 @@ beforeEach(() => {
   mockNavigate.mockReset();
   mockGetDashboardStats.mockReset();
   mockUseAuth.mockReset().mockReturnValue({
-    state: { user: { username: 'alice' } },
+    state: { user: { fullName: 'alice', email: 'alice@x.com' } },
   });
   mockUsePermissions.mockReset().mockReturnValue({
     canEdit: () => true,
-    user: { username: 'alice' },
+    user: { fullName: 'alice', email: 'alice@x.com' },
   });
   mockUseGraph.mockReset().mockReturnValue({
     state: { graphs: [{ id: 1, title: 'G1' }] },

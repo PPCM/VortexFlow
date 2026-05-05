@@ -153,34 +153,64 @@ class ApiService {
   // =====================================
   // Méthodes Gestion des Graphiques
   // =====================================
+  // The backend returns raw shapes ({ graphs, pagination }, { message, graph }, the
+  // bare Graph, etc.); these methods adapt them to the ApiResponse envelope the
+  // contexts expect.
+
   async getGraphs(filters?: GraphFilters): Promise<ApiResponse<PaginatedResponse<Graph>>> {
     const response = await this.client.get('/graphs', { params: filters });
-    return response.data;
+    const { graphs, pagination } = response.data;
+    return {
+      success: true,
+      data: {
+        data: graphs,
+        total: pagination?.total ?? graphs.length,
+        page: pagination?.page ?? 1,
+        limit: pagination?.limit ?? graphs.length,
+        totalPages: pagination?.pages ?? 1,
+      },
+    };
   }
 
   async getGraph(id: number): Promise<ApiResponse<Graph>> {
     const response = await this.client.get(`/graphs/${id}`);
-    return response.data;
+    return { success: true, data: response.data as Graph };
   }
 
   async createGraph(graphData: Partial<Graph>): Promise<ApiResponse<Graph>> {
     const response = await this.client.post('/graphs', graphData);
-    return response.data;
+    return {
+      success: true,
+      data: response.data.graph,
+      message: response.data.message,
+    };
   }
 
   async updateGraph(id: number, graphData: Partial<Graph>): Promise<ApiResponse<Graph>> {
     const response = await this.client.put(`/graphs/${id}`, graphData);
-    return response.data;
+    return {
+      success: true,
+      data: response.data.graph,
+      message: response.data.message,
+    };
   }
 
   async deleteGraph(id: number): Promise<ApiResponse<void>> {
     const response = await this.client.delete(`/graphs/${id}`);
-    return response.data;
+    return {
+      success: true,
+      data: undefined as any,
+      message: response.data.message,
+    };
   }
 
   async duplicateGraph(id: number, name: string): Promise<ApiResponse<Graph>> {
-    const response = await this.client.post(`/graphs/${id}/duplicate`, { name });
-    return response.data;
+    const response = await this.client.post(`/graphs/${id}/duplicate`, { title: name });
+    return {
+      success: true,
+      data: response.data.graph,
+      message: response.data.message,
+    };
   }
 
   async shareGraph(id: number, isPublic: boolean): Promise<ApiResponse<Graph>> {
