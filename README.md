@@ -115,7 +115,7 @@ VortexFlow/
 ├── frontend/         # Interface React
 ├── database/         # Schémas et migrations
 ├── docker/          # Configuration Docker
-├── docs/            # Documentation
+├── doc/            # Documentation
 └── tests/           # Tests automatisés
 ```
 
@@ -134,10 +134,10 @@ npm run test:integration
 
 ## 📚 Documentation
 
-- [Guide Utilisateur](docs/user-guide.md)
-- [API Documentation](docs/api.md)
-- [Guide Développeur](docs/developer-guide.md)
-- [Syntaxe DOT Étendue](docs/dot-syntax.md)
+- [Guide Utilisateur](doc/user-guide.md)
+- [API Documentation](doc/api.md)
+- [Guide Développeur](doc/developer-guide.md)
+- [Syntaxe DOT Étendue](doc/dot-syntax.md)
 
 ## 🔒 Sécurité
 
@@ -241,14 +241,14 @@ npm run dev
 ### 📚 **Documentation Backend Complète**
 
 **✅ Organisation finalisée le 2025-07-07**  
-Toute la documentation backend est maintenant parfaitement organisée dans [`backend/docs/`](./backend/docs/) :
+Toute la documentation backend est maintenant parfaitement organisée dans [`backend/doc/`](./backend/doc/) :
 
-- **📖 [Index Documentation](./backend/docs/README.md)** - Vue d'ensemble complète
-- **🚀 [API Documentation](./backend/docs/API_DOCUMENTATION.md)** - Référence API REST
-- **🔐 [Authentication Guide](./backend/docs/AUTHENTICATION.md)** - Sessions et sécurité
-- **⚙️ [Configuration Guide](./backend/docs/CONFIGURATION.md)** - Variables d'environnement
-- **🐳 [Deployment Guide](./backend/docs/DEPLOYMENT.md)** - Déploiement production
-- **💻 [Development Guide](./backend/docs/DEVELOPMENT.md)** - Guide développement
+- **📖 [Index Documentation](./backend/doc/README.md)** - Vue d'ensemble complète
+- **🚀 [API Documentation](./backend/doc/API_DOCUMENTATION.md)** - Référence API REST
+- **🔐 [Authentication Guide](./backend/doc/AUTHENTICATION.md)** - Sessions et sécurité
+- **⚙️ [Configuration Guide](./backend/doc/CONFIGURATION.md)** - Variables d'environnement
+- **🐳 [Deployment Guide](./backend/doc/DEPLOYMENT.md)** - Déploiement production
+- **💻 [Development Guide](./backend/doc/DEVELOPMENT.md)** - Guide développement
 - **🔧 Script de navigation** : `./backend/browse-docs.sh`
 
 ### 📋 **Prochaines Étapes**

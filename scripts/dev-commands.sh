@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Resolve project root (parent of scripts/) so the script works from any cwd.
+cd "$(dirname "$0")/.."
+
 # Commandes de développement VortexFlow
 
 case "$1" in

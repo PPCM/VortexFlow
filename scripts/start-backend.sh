@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Resolve project root (parent of scripts/) so the script works from any cwd.
+cd "$(dirname "$0")/.."
+
 # Script de démarrage du backend VortexFlow avec configuration IPv4
 
 # Export des variables d'environnement depuis le fichier .env

@@ -4,10 +4,10 @@
 
 ```bash
 # Démarrage complet de l'application
-./start-vortexflow.sh
+./scripts/start-vortexflow.sh
 
 # Arrêt de l'application
-./stop-vortexflow.sh
+./scripts/stop-vortexflow.sh
 ```
 
 ## 📋 Prérequis
@@ -140,8 +140,8 @@ cd backend && npm run start:env
 cd frontend && npm start
 
 # Démarrage automatisé (recommandé)
-./start-vortexflow.sh
-./stop-vortexflow.sh
+./scripts/start-vortexflow.sh
+./scripts/stop-vortexflow.sh
 ```
 
 ## 🔍 Diagnostic
