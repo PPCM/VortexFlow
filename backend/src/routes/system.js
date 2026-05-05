@@ -108,14 +108,14 @@ router.get('/stats',
       // User stats
       User.count(),
       User.count({ where: { is_active: true } }),
-      User.count({ where: { created_at: { [Op.gte]: last24h } } }),
-      User.count({ where: { created_at: { [Op.gte]: last7d } } }),
+      User.count({ where: { createdAt: { [Op.gte]: last24h } } }),
+      User.count({ where: { createdAt: { [Op.gte]: last7d } } }),
       
       // Graph stats
       Graph.count(),
       Graph.count({ where: { is_public: true } }),
-      Graph.count({ where: { created_at: { [Op.gte]: last24h } } }),
-      Graph.count({ where: { created_at: { [Op.gte]: last7d } } }),
+      Graph.count({ where: { createdAt: { [Op.gte]: last24h } } }),
+      Graph.count({ where: { createdAt: { [Op.gte]: last7d } } }),
       
       // Simulation stats
       SimulationSession.count(),
@@ -285,7 +285,7 @@ router.post('/cleanup',
         const { count } = await SimulationSession.destroy({
           where: {
             status: { [Op.in]: ['completed', 'failed', 'cancelled'] },
-            created_at: { [Op.lt]: cutoffDate }
+            createdAt: { [Op.lt]: cutoffDate }
           }
         });
         results.sessionsDeleted = count;

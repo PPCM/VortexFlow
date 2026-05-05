@@ -121,7 +121,8 @@ digraph example {
   // =====================================
   useEffect(() => {
     if (!isNewGraph && id) {
-      loadGraph(Number(id));
+      // Backend graph IDs are UUIDs (strings); pass through unchanged.
+      loadGraph(id as any);
     } else {
       // Initialiser un nouveau graphique
       setDotContent(`digraph exemple {
@@ -145,10 +146,13 @@ digraph example {
 
   useEffect(() => {
     if (currentGraph) {
-      setGraphName(currentGraph.name);
-      setGraphDescription(currentGraph.description || '');
-      setIsPublic(currentGraph.is_public);
-      setDotContent(currentGraph.dot_content || '');
+      // Backend renvoie title/dotCode/isPublic (camelCase); fallback aux
+      // noms snake_case au cas où une autre source les fournirait.
+      const g = currentGraph as any;
+      setGraphName(g.title ?? g.name ?? '');
+      setGraphDescription(g.description || '');
+      setIsPublic(g.isPublic ?? g.is_public ?? false);
+      setDotContent(g.dotCode ?? g.dot_code ?? g.dot_content ?? '');
     }
   }, [currentGraph]);
 

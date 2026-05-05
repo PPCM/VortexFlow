@@ -87,6 +87,7 @@ describe('GraphViewer', () => {
     const ctx = baseCtx();
     mockUseGraph.mockReturnValue(ctx);
     render(<GraphViewer />);
-    await waitFor(() => expect(ctx.loadGraph).toHaveBeenCalledWith(5));
+    // IDs are passed as strings (UUIDs in production) — no Number coercion.
+    await waitFor(() => expect(ctx.loadGraph).toHaveBeenCalledWith('5'));
   });
 });

@@ -90,7 +90,8 @@ const GraphViewer: React.FC = () => {
   // =====================================
   useEffect(() => {
     if (id) {
-      loadGraph(Number(id));
+      // Backend graph IDs are UUIDs (strings); don't coerce.
+      loadGraph(id as any);
     }
   }, [id, loadGraph]);
 

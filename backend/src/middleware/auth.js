@@ -95,9 +95,9 @@ const optionalAuth = async (req, res, next) => {
 const requireGraphAccess = (accessType = 'view') => {
   return async (req, res, next) => {
     try {
-      const { Graph, GraphShare } = require('../models');
+      const { Graph, GraphShare, User } = require('../models');
       const graphId = req.params.id || req.params.graphId;
-      
+
       if (!graphId) {
         return res.status(400).json({
           error: 'Graph ID required',
@@ -106,12 +106,19 @@ const requireGraphAccess = (accessType = 'view') => {
       }
 
       const graph = await Graph.findByPk(graphId, {
-        include: [{
-          model: GraphShare,
-          as: 'shares',
-          where: { is_active: true },
-          required: false
-        }]
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['id', 'email', 'first_name', 'last_name']
+          },
+          {
+            model: GraphShare,
+            as: 'shares',
+            where: { is_active: true },
+            required: false
+          }
+        ]
       });
 
       if (!graph) {

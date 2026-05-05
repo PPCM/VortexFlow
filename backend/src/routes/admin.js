@@ -36,7 +36,7 @@ router.get('/stats', async (req, res) => {
       SimulationSession.count({ where: { status: 'running' } }),
       User.count({ 
         where: { 
-          created_at: { 
+          createdAt: { 
             [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
           } 
         } 

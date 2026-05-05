@@ -83,10 +83,15 @@ const UserProfile: React.FC = () => {
   
   // Données utilisateur
   const [userData, setUserData] = useState({
-    username: authState.user?.username || '',
+    // Backend ne renvoie pas `username`; fallback sur fullName/firstName/email.
+    username: (authState.user as any)?.username
+      || (authState.user as any)?.fullName
+      || (authState.user as any)?.firstName
+      || authState.user?.email
+      || '',
     email: authState.user?.email || '',
-    firstName: '',
-    lastName: '',
+    firstName: (authState.user as any)?.firstName || '',
+    lastName: (authState.user as any)?.lastName || '',
     bio: '',
   });
   
@@ -331,12 +336,18 @@ const UserProfile: React.FC = () => {
                   fontSize: '2rem',
                 }}
               >
-                {authState.user?.username.charAt(0).toUpperCase()}
+                {(((authState.user as any)?.fullName as string)
+                  || ((authState.user as any)?.firstName as string)
+                  || (authState.user?.email as string)
+                  || '?').charAt(0).toUpperCase()}
               </Avatar>
-              
+
               <Box sx={{ flexGrow: 1 }}>
                 <Typography variant="h5" gutterBottom>
-                  {authState.user?.username}
+                  {(authState.user as any)?.fullName
+                    || (authState.user as any)?.firstName
+                    || authState.user?.email
+                    || 'Utilisateur'}
                 </Typography>
                 <Chip
                   label={authState.user?.role}

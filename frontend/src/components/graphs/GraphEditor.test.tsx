@@ -94,7 +94,7 @@ describe('GraphEditor', () => {
     mockUseGraph.mockReturnValue(ctx);
     mockUseParams.mockReturnValue({ id: '7' });
     render(<GraphEditor />);
-    await waitFor(() => expect(ctx.loadGraph).toHaveBeenCalledWith(7));
+    await waitFor(() => expect(ctx.loadGraph).toHaveBeenCalledWith('7'));
   });
 
   test('does not call loadGraph for new-graph route', async () => {

@@ -39,7 +39,7 @@ router.get('/stats',
         Graph.count({
           where: {
             user_id: req.user.id,
-            updated_at: {
+            updatedAt: {
               [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
             }
           }
