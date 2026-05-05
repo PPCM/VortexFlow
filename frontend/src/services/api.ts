@@ -363,33 +363,55 @@ class ApiService {
     return response.data;
   }
 
+  // Backend responses for /simulation are { message, session } / { message };
+  // wrap them in the ApiResponse envelope expected by the contexts.
+
   async startSimulation(data: {
     graphId: string;
     sessionName?: string;
     config?: any;
   }): Promise<ApiResponse<any>> {
     const response = await this.client.post('/simulation/start', data);
-    return response.data;
+    return {
+      success: true,
+      data: response.data.session,
+      message: response.data.message,
+    };
   }
 
   async stopSimulation(sessionId: string): Promise<ApiResponse<any>> {
     const response = await this.client.post(`/simulation/${sessionId}/stop`);
-    return response.data;
+    return {
+      success: true,
+      data: response.data.session,
+      message: response.data.message,
+    };
   }
 
   async pauseSimulation(sessionId: string): Promise<ApiResponse<any>> {
     const response = await this.client.post(`/simulation/${sessionId}/pause`);
-    return response.data;
+    return {
+      success: true,
+      data: response.data.session,
+      message: response.data.message,
+    };
   }
 
   async resumeSimulation(sessionId: string): Promise<ApiResponse<any>> {
     const response = await this.client.post(`/simulation/${sessionId}/resume`);
-    return response.data;
+    return {
+      success: true,
+      data: response.data.session,
+      message: response.data.message,
+    };
   }
 
   async getSimulationTemplates(): Promise<ApiResponse<any>> {
     const response = await this.client.get('/simulation/templates');
-    return response.data;
+    return {
+      success: true,
+      data: response.data.templates,
+    };
   }
 
   async validateSimulationConfig(config: any): Promise<ApiResponse<any>> {

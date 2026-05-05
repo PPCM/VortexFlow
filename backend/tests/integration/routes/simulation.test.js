@@ -250,7 +250,7 @@ describe('POST /api/simulation/:id/stop', () => {
     const res = await request(buildApp()).post('/api/simulation/sess-1/stop');
     expect(res.status).toBe(200);
     expect(s.update).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'cancelled',
+      status: 'completed',
       end_time: expect.any(Date),
       duration: expect.any(Number),
     }));

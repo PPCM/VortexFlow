@@ -284,7 +284,7 @@ router.post('/cleanup',
       if (cleanupOldSessions) {
         const { count } = await SimulationSession.destroy({
           where: {
-            status: { [Op.in]: ['completed', 'failed', 'cancelled'] },
+            status: { [Op.in]: ['completed', 'failed'] },
             createdAt: { [Op.lt]: cutoffDate }
           }
         });

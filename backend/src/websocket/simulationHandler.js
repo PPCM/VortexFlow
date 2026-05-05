@@ -336,7 +336,7 @@ class SimulationHandler {
         
         const duration = Math.floor((Date.now() - activeSession.startTime) / 1000);
         await activeSession.session.update({
-          status: 'cancelled',
+          status: 'completed',
           end_time: new Date(),
           duration
         });

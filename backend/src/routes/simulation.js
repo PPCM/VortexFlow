@@ -15,7 +15,7 @@ router.get('/sessions',
   [
     query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
     query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
-    query('status').optional().isIn(['pending', 'running', 'completed', 'failed', 'cancelled']).withMessage('Invalid status'),
+    query('status').optional().isIn(['running', 'paused', 'completed', 'failed']).withMessage('Invalid status'),
     query('graphId').optional().isUUID().withMessage('Graph ID must be a valid UUID')
   ],
   asyncHandler(async (req, res) => {
@@ -297,7 +297,7 @@ router.post('/:id/stop',
     const duration = Math.floor((new Date() - new Date(session.start_time)) / 1000);
 
     await session.update({
-      status: 'cancelled',
+      status: 'completed',
       end_time: new Date(),
       duration
     });

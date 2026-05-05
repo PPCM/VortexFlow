@@ -233,7 +233,7 @@ describe('cleanup', () => {
     expect(stop1).toHaveBeenCalled();
     expect(stop2).toHaveBeenCalled();
     expect(update1).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'cancelled',
+      status: 'completed',
       end_time: expect.any(Date),
       duration: expect.any(Number),
     }));
