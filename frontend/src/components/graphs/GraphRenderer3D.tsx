@@ -35,6 +35,8 @@ import {
   BlurOn as BlurOnIcon,
   TextFields as TextFieldsIcon,
   FlashOn as FlashOnIcon,
+  PlayArrow as PlayArrowIcon,
+  Pause as PauseIcon,
   Timeline as CurveIcon,
   LineWeight as WidthIcon,
   Tune as TuneIcon
@@ -95,8 +97,8 @@ interface ForceGraphLink {
 // =====================================
 // Utilitaires de parsing DOT vers 3D
 // =====================================
-class DotTo3DConverter {
-  static async parseDotToGraphData(dotContent: string): Promise<{ nodes: ForceGraphNode[], links: ForceGraphLink[] }> {
+export class DotTo3DConverter {
+  static async parseDotToGraphData(dotContent: string): Promise<{ nodes: ForceGraphNode[], links: ForceGraphLink[], globalSettings?: any }> {
     // Utiliser le backend pour le parsing robuste
     try {
       const apiUrl = 'http://192.168.5.30:5000/api/public/parse-dot';
@@ -127,10 +129,19 @@ class DotTo3DConverter {
     }
   }
   
-  static parseDotToGraphDataFrontend(dotContent: string): { nodes: ForceGraphNode[], links: ForceGraphLink[] } {
+  static parseDotToGraphDataFrontend(dotContent: string): { nodes: ForceGraphNode[], links: ForceGraphLink[], globalSettings?: any } {
     const nodes: ForceGraphNode[] = [];
     const links: ForceGraphLink[] = [];
     const nodeMap = new Map<string, ForceGraphNode>();
+    
+    // Défaut pour les attributs globaux
+    const globalSettings = {
+      defaultNodeSize: 6,
+      autoColors: true,
+      autoResize: true,
+      particlesEnabled: true,
+      bloomEffect: true
+    };
     
     // Nettoyer le contenu DOT et supprimer tout ce qui n'est pas essentiel
     let cleanContent = dotContent
@@ -264,12 +275,41 @@ class DotTo3DConverter {
     }
     
     console.log('Nœuds traités:', Array.from(nodeMap.keys()));
+    // Parser les attributs globaux depuis le contenu DOT
+    const globalAttrsRegex = /graph\s*\[(.*?)\]/gi;
+    let globalMatch;
+    while ((globalMatch = globalAttrsRegex.exec(cleanContent)) !== null) {
+      const attrs = this.parseAttributes(globalMatch[1]);
+      
+      // Appliquer les attributs globaux détectés
+      if (attrs.defaultNodeSize) {
+        globalSettings.defaultNodeSize = parseFloat(attrs.defaultNodeSize) || 6;
+      }
+      if (attrs.autoColors !== undefined) {
+        const parsed = this.parseBoolean(attrs.autoColors);
+        if (parsed !== undefined) globalSettings.autoColors = parsed;
+      }
+      if (attrs.autoResize !== undefined) {
+        const parsed = this.parseBoolean(attrs.autoResize);
+        if (parsed !== undefined) globalSettings.autoResize = parsed;
+      }
+      if (attrs.particlesEnabled !== undefined) {
+        const parsed = this.parseBoolean(attrs.particlesEnabled);
+        if (parsed !== undefined) globalSettings.particlesEnabled = parsed;
+      }
+      if (attrs.bloomEffect !== undefined) {
+        const parsed = this.parseBoolean(attrs.bloomEffect);
+        if (parsed !== undefined) globalSettings.bloomEffect = parsed;
+      }
+    }
+    
     console.log('Liens créés:', links.length);
+    console.log('🌐 Global settings parsed:', globalSettings);
     
     // Convertir la Map en tableau
     nodes.push(...Array.from(nodeMap.values()));
     
-    return { nodes, links };
+    return { nodes, links, globalSettings };
   }
   
   // Parser robuste pour extraire les nœuds avec leurs attributs complets
@@ -315,9 +355,18 @@ class DotTo3DConverter {
   }
   
   // Convertir les données du backend vers le format attendu par le graphique 3D
-  static convertBackendDataToGraph(backendData: any): { nodes: ForceGraphNode[], links: ForceGraphLink[] } {
+  static convertBackendDataToGraph(backendData: any): { nodes: ForceGraphNode[], links: ForceGraphLink[], globalSettings?: any } {
     const nodes: ForceGraphNode[] = [];
     const links: ForceGraphLink[] = [];
+    
+    // Extraire les attributs globaux s'ils existent
+    const globalSettings = {
+      defaultNodeSize: backendData.globalSettings?.defaultNodeSize || 6,
+      autoColors: backendData.globalSettings?.autoColors !== false, // true par défaut
+      autoResize: backendData.globalSettings?.autoResize !== false, // true par défaut
+      particlesEnabled: backendData.globalSettings?.particlesEnabled !== false, // true par défaut
+      bloomEffect: backendData.globalSettings?.bloomEffect !== false // true par défaut
+    };
     
     // Convertir les nœuds du backend
     if (backendData.nodes) {
@@ -355,7 +404,8 @@ class DotTo3DConverter {
     }
     
     console.log(`🔄 Converted backend data: ${nodes.length} nodes, ${links.length} links`);
-    return { nodes, links };
+    console.log('🌐 Global settings:', globalSettings);
+    return { nodes, links, globalSettings };
   }
 
   private static parseAttributes(attrsString?: string): Record<string, string> {
@@ -483,7 +533,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
   // État pour les contrôles de rendu
   const [showArrows, setShowArrows] = useState(true);
-  const [showParticles, setShowParticles] = useState(false);
+  const [showParticles, setShowParticles] = useState(true);
   const [showNodeText, setShowNodeText] = useState(true); // Afficher les labels par défaut
   const [showLinkText, setShowLinkText] = useState(true); // Afficher les labels de liens par défaut
   const [emitParticles, setEmitParticles] = useState(false);
@@ -491,6 +541,15 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   const [linkWidth, setLinkWidth] = useState(0); // Liens invisibles par défaut
   const [nodeSpacing, setNodeSpacing] = useState(30); // Espacement entre nœuds (10 = serré, 100 = espacé)
   const [nodeSize, setNodeSize] = useState(6); // Taille des nœuds légèrement plus grande par défaut
+  
+  // États pour simulation temps réel
+  const [simulationRunning, setSimulationRunning] = useState(false);
+  const [nodeAccumulation, setNodeAccumulation] = useState<Map<string, number>>(new Map());
+  const [simulationStats, setSimulationStats] = useState({
+    totalParticles: 0,
+    averageLatency: 0,
+    bottleneckNodes: 0
+  });
   
   // États pour les accordéons
   const [controlsExpanded, setControlsExpanded] = useState(false); // Accordéon "Contrôles Visuels" fermé par défaut
@@ -784,6 +843,15 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       spriteText.textHeight = 2;
       spriteText.color = node.color || '#4fc3f7'; // Couleur du nœud
       // Pas de backgroundColor pour éviter le cadre noir
+      
+      // Configuration du matériau pour la gestion de la profondeur
+      if (spriteText.material) {
+        spriteText.material.depthTest = true;
+        spriteText.material.depthWrite = false;
+        spriteText.material.transparent = true;
+        spriteText.material.alphaTest = 0.1;
+      }
+      
       return spriteText;
     }
     
@@ -866,23 +934,31 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         spriteText.color = node.color || '#4fc3f7'; // Couleur du nœud
         // Pas de backgroundColor pour éviter le cadre noir
         
+        // Configuration du matériau pour la gestion de la profondeur
+        if (spriteText.material) {
+          spriteText.material.depthTest = true;
+          spriteText.material.depthWrite = false;
+          spriteText.material.transparent = true;
+          spriteText.material.alphaTest = 0.1;
+        }
+        
         // Positionner le texte au-dessus de la géométrie selon le type
-        let textYOffset = 4; // Valeur par défaut augmentée
+        let textYOffset = 6; // Valeur par défaut augmentée pour plus d'espace
         switch (node.geometry) {
           case '3d-box':
-            textYOffset = (dimensions.height || 8) / 2 + 3; // +3 au lieu de +1
+            textYOffset = (dimensions.height || 8) / 2 + 5; // +5 pour plus d'espace
             break;
           case '3d-sphere':
-            textYOffset = (dimensions.radius || 4) + 3; // +3 au lieu de +1
+            textYOffset = (dimensions.radius || 4) + 5; // +5 pour plus d'espace
             break;
           case '3d-cylinder':
-            textYOffset = (dimensions.height || 8) / 2 + 3; // +3 au lieu de +1
+            textYOffset = (dimensions.height || 8) / 2 + 5; // +5 pour plus d'espace
             break;
           case '3d-cone':
-            textYOffset = (dimensions.height || 8) / 2 + 3; // +3 au lieu de +1
+            textYOffset = (dimensions.height || 8) / 2 + 5; // +5 pour plus d'espace
             break;
           case '3d-torus':
-            textYOffset = (dimensions.radius || 4) + 3; // +3 au lieu de +1
+            textYOffset = (dimensions.radius || 4) + 5; // +5 pour plus d'espace
             break;
         }
         spriteText.position.set(0, textYOffset, 0);
@@ -898,7 +974,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   }, [showNodeText]);
 
   // Initialisation du graphique 3D
-  const initializeGraph = useCallback(async () => {
+  const initializeGraph = async () => {
     if (!graphRef.current || !isValid) return;
 
     try {
@@ -906,16 +982,42 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       setError(null);
 
       // Parser le contenu DOT (async)
-      const graphData = await DotTo3DConverter.parseDotToGraphData(dotContent);
+      const result = await DotTo3DConverter.parseDotToGraphData(dotContent);
       
-      if (graphData.nodes.length === 0) {
-        setError('Aucun nœud détecté dans le graphique DOT');
-        return;
+      if (result.nodes.length === 0) {
+        throw new Error('Aucun nœud trouvé dans le fichier DOT');
       }
       
-      // Sauvegarder les données du graphique pour les overlays
-      setCurrentGraphData(graphData);
+      // Appliquer les attributs globaux si disponibles
+      if (result.globalSettings) {
+        console.log('🌐 Applying global settings:', result.globalSettings);
+        
+        // Appliquer defaultNodeSize si défini
+        if (result.globalSettings.defaultNodeSize && result.globalSettings.defaultNodeSize !== nodeSize) {
+          setNodeSize(result.globalSettings.defaultNodeSize);
+        }
+        
+        // Appliquer particlesEnabled - contrôle l'affichage des particules
+        if (result.globalSettings.particlesEnabled !== undefined) {
+          if (!result.globalSettings.particlesEnabled && showParticles) {
+            setShowParticles(false);
+            console.log('🚫 Particles disabled by global settings');
+          } else if (result.globalSettings.particlesEnabled && !showParticles) {
+            setShowParticles(true);
+            console.log('✅ Particles enabled by global settings');
+          }
+        }
+        
+        // Note: autoColors et autoResize sont appliqués automatiquement lors du parsing des nœuds
+        // bloomEffect est appliqué au niveau du rendu Three.js
+        console.log('🎨 autoColors:', result.globalSettings.autoColors);
+        console.log('📏 autoResize:', result.globalSettings.autoResize);
+        console.log('✨ bloomEffect:', result.globalSettings.bloomEffect);
+      }
       
+      setCurrentGraphData({ nodes: result.nodes, links: result.links });
+      const graphData = { nodes: result.nodes, links: result.links };
+
       // Créer ou réinitialiser le graphique 3D
       if (forceGraphRef.current) {
         forceGraphRef.current._destructor();
@@ -947,47 +1049,32 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
             baseSize = Math.max(4, Math.min(12, 4 + node.particleGeneration / 50));
           }
           
-          // 2. Effet bloom si activé
-          if (node.bloomEffect && node.particleGeneration && node.maxParticleProcessing) {
-            const accumulation = Math.max(0, node.particleGeneration - node.maxParticleProcessing);
-            const bloomMultiplier = 1 + (accumulation / 100); // Facteur bloom
-            return baseSize * bloomMultiplier;
-          }
-          
-          return node.val || baseSize;
+          return baseSize;
         })
-        .nodeColor((node: any) => {
-          // Couleur avec effet bloom pour goulots
-          if (node.bloomEffect && node.particleGeneration && node.maxParticleProcessing) {
-            const accumulation = Math.max(0, node.particleGeneration - node.maxParticleProcessing);
-            if (accumulation > 0) {
-              // Mélange vers rouge pour les goulots
-              const intensity = Math.min(1, accumulation / 50);
-              return `hsl(${360 - intensity * 180}, 80%, ${50 + intensity * 20}%)`;
-            }
-          }
-          return node.color || '#4fc3f7';
-        })
-        .nodeThreeObject(nodeThreeObjectCallback);
-
-      // Configuration avancée des liens avec particules personnalisées
-      graph
-        // Utiliser la méthode officielle pour les labels de liens
-        .linkThreeObjectExtend(true) // Étendre les liens au lieu de les remplacer
+        .nodeColor((node: any) => node.color || '#4fc3f7')
+        .nodeThreeObject(nodeThreeObjectCallback)
+        .linkLabel((link: any) => showLinkText && link.name ? link.name : '')
+        .linkThreeObjectExtend(true)
         .linkThreeObject((link: any) => {
-          console.log('linkThreeObject called with:', link, 'showLinkText:', showLinkText);
-          if (!showLinkText) return null; // Pas de label quand désactivé
+          if (!showLinkText || !link.name) return;
           
-          const linkText = link.name || link.label || '';
-          if (!linkText) return null;
-          
-          // Créer un SpriteText pour le label (comme dans l'exemple officiel)
-          const sprite = new SpriteText(linkText);
-          sprite.color = link.color || '#999999';
+          const sprite = new SpriteText(link.name);
+          sprite.color = link.color || '#ffffff';
           sprite.textHeight = 1.5;
           // Pas de backgroundColor pour éviter le cadre noir
+          sprite.padding = 1;
+          sprite.borderRadius = 1;
           
-          console.log('Created link sprite for:', linkText);
+          // Configuration du matériau pour la gestion de la profondeur
+          if (sprite.material) {
+            sprite.material.depthTest = true;
+            sprite.material.depthWrite = false;
+            sprite.material.transparent = true;
+            sprite.material.alphaTest = 0.1;
+            // Ordre de rendu plus élevé pour que les liens apparaissent derrière les nœuds
+            sprite.renderOrder = -1;
+          }
+          
           return sprite;
         })
         .linkPositionUpdate((sprite: any, { start, end }: any) => {
@@ -1003,98 +1090,35 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           // Positionner le sprite au milieu
           Object.assign(sprite.position, middlePos);
         })
-        .linkColor((link: any) => link.color || '#999999') // Utiliser la couleur DOT ou défaut
-        .linkWidth(linkWidth) // Utiliser uniquement la valeur du contrôle
-        // Courbes pour les liens
-        .linkCurvature(linkCurvature) // Courbure dynamique contrôlée
-        .linkCurveRotation(Math.PI / 4) // Rotation de la courbe
-        // Flèches directionnelles toujours visibles si activées
-        .linkDirectionalArrowLength(showArrows ? 6 : 0) // Taille fixe pour visibilité
-        .linkDirectionalArrowRelPos(1.0)
-        .linkDirectionalArrowColor((link: any) => link.color || '#ff6b6b')
-        .linkDirectionalArrowResolution(8)
-        // Style des liens selon attribut DOT
+        .linkColor((link: any) => link.color || '#999999')
+        .linkWidth(linkWidth)
+        .linkCurvature(linkCurvature)
+        .linkCurveRotation(Math.PI / 4)
+        .linkDirectionalArrowLength(showArrows ? Math.max(20, linkWidth * 8) : 0)
+        .linkDirectionalArrowRelPos(0.95)
+        .linkDirectionalArrowColor(() => '#FF0000') // Rouge vif pour debug
+        .linkDirectionalArrowResolution(12)
         .linkOpacity((link: any) => {
           if (link.style === 'dashed') return 0.6;
           if (link.style === 'dotted') return 0.4;
           return 0.8;
-        });
-
-      // Particules avancées basées sur les attributs DOT
-      if (showParticles) {
-        graph
-          .linkDirectionalParticles((link: any) => {
-            // Nombre de particules selon maxParticleFlow
-            if (link.maxParticleFlow) {
-              return Math.min(8, Math.max(1, Math.floor(link.maxParticleFlow / 10)));
-            }
-            return 2; // Défaut
-          })
-          .linkDirectionalParticleSpeed((link: any) => {
-            // Vitesse selon particleSpeed
-            if (link.particleSpeed) {
-              return link.particleSpeed * 0.01; // Facteur d'échelle
-            }
-            return 0.01; // Défaut
-          })
-          .linkDirectionalParticleWidth((link: any) => {
-            // Largeur des particules selon maxParticleFlow
-            if (link.maxParticleFlow && link.maxParticleFlow > 50) {
-              return 3; // Particules plus grosses pour flux importants
-            }
-            return 2;
-          })
-          .linkDirectionalParticleColor((link: any) => {
-            // Couleur selon intensité du flux
-            if (link.maxParticleFlow && link.maxParticleFlow > 30) {
-              return '#ff6b35'; // Orange pour flux intenses
-            }
-            return link.color || '#4fc3f7';
-          });
-      } else {
-        // Désactiver les particules
-        graph.linkDirectionalParticles(0);
-      }
-
-      // Émission de particules depuis les nœuds (simplifiée)
-      if (emitParticles) {
-        graph.d3Force('charge')?.strength(-200);
-        // L'émission de particules sera implémentée plus tard
-        console.log('Mode émission de particules activé');
-      }
-
-      // Événements d'interaction
-      graph
-        .onNodeClick((node: any) => {
-          console.log('Node clicked:', node);
-          // Animation de zoom vers le nœud
-          const distance = 40;
-          const distRatio = 1 + distance / Math.hypot(node.x, node.y, node.z);
-          graph.cameraPosition(
-            { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
-            node,
-            3000
-          );
         })
-        .onNodeHover((node: any) => {
-          document.body.style.cursor = node ? 'pointer' : 'default';
+        .linkDirectionalParticles((link: any) => {
+          if (!showParticles) return 0;
+          if (emitParticles && link.maxParticleFlow) {
+            return Math.min(8, Math.max(1, Math.floor(link.maxParticleFlow / 10)));
+          }
+          return showParticles ? 2 : 0;
         })
-        .onLinkHover((link: any) => {
-          // Hover effect pour les liens (peut être amélioré plus tard)
-          document.body.style.cursor = link ? 'pointer' : 'default';
-        });
-
-      // Laisser le framework 3d-force-graph gérer l'espacement naturellement
-      // Pas de configuration forcée des forces physiques
-
-      forceGraphRef.current = graph;
+        .linkDirectionalParticleSpeed(0.01)
+        .linkDirectionalParticleColor(() => '#ffff00');
 
       // Stats de rendu
       const updateStats = () => {
         setRenderStats({
           nodes: graphData.nodes.length,
           links: graphData.links.length,
-          fps: Math.round(graph.renderer().info.render.frame / 60)
+          fps: 60 // Valeur par défaut
         });
       };
       
@@ -1107,7 +1131,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [dotContent, isValid, dimensions.width, dimensions.height, nodeSize]);
+  };
 
   // Effet pour redimensionner le graphique 3D quand les dimensions changent
   useEffect(() => {
@@ -1125,17 +1149,99 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     forceGraphRef.current
       .linkWidth(linkWidth)
       .linkCurvature(linkCurvature)
-      .linkDirectionalArrowLength(showArrows ? Math.max(3.5, linkWidth * 3.5) : 0);
+      .linkDirectionalArrowLength(showArrows ? Math.max(20, linkWidth * 8) : 0)
+      .linkDirectionalArrowRelPos(0.95)
+      .linkDirectionalArrowColor(() => '#FF0000') // Rouge vif pour debug
+      .linkDirectionalArrowResolution(12);
   }, [linkWidth, linkCurvature, showArrows]);
 
   const updateParticleProperties = useCallback(() => {
     if (!forceGraphRef.current) return;
     
     forceGraphRef.current
-      .linkDirectionalParticles(showParticles ? (emitParticles ? 4 : 1) : 0)
-      .linkDirectionalParticleSpeed(0.008)
-      .linkDirectionalParticleWidth(2);
+      // Nombre de particules basé sur maxParticleFlow ou contrôle UI
+      .linkDirectionalParticles((link: any) => {
+        if (!showParticles) return 0;
+        
+        // Utiliser maxParticleFlow du DOT si disponible
+        if (link.maxParticleFlow && link.maxParticleFlow > 0) {
+          // Convertir maxParticleFlow en nombre de particules (1-10)
+          return Math.max(1, Math.min(10, Math.floor(link.maxParticleFlow / 20)));
+        }
+        
+        // Sinon utiliser contrôle UI (mode classique)
+        return emitParticles ? 4 : 1;
+      })
+      // Vitesse basée sur particleSpeed ou contrôle UI
+      .linkDirectionalParticleSpeed((link: any) => {
+        // Utiliser particleSpeed du DOT si disponible
+        if (link.particleSpeed && link.particleSpeed > 0) {
+          // Normaliser particleSpeed (0.5-6.0) vers vitesse graphique (0.001-0.02)
+          return Math.max(0.001, Math.min(0.02, link.particleSpeed * 0.003));
+        }
+        
+        // Vitesse par défaut
+        return 0.008;
+      })
+      // Largeur des particules proportionnelle au débit
+      .linkDirectionalParticleWidth((link: any) => {
+        if (link.maxParticleFlow && link.maxParticleFlow > 0) {
+          // Particules plus épaisses pour fort débit
+          return Math.max(1, Math.min(4, link.maxParticleFlow / 50));
+        }
+        return 2; // Taille par défaut
+      })
+      // Couleur des particules match celle du lien
+      .linkDirectionalParticleColor((link: any) => {
+        return link.color || '#ffa500'; // Orange par défaut pour visibilité
+      });
   }, [showParticles, emitParticles]);
+
+  // Simulation temps réel des accumulations
+  useEffect(() => {
+    if (!simulationRunning || !currentGraphData?.nodes) return;
+    
+    const interval = setInterval(() => {
+      const newAccumulation = new Map<string, number>();
+      let totalParticles = 0;
+      let bottleneckCount = 0;
+      
+      currentGraphData.nodes.forEach((node: any) => {
+        if (node.particleGeneration && node.maxParticleProcessing) {
+          // Calculer accumulation réelle
+          const currentAccumulation = nodeAccumulation.get(node.id) || 0;
+          const generation = node.particleGeneration;
+          const processing = node.maxParticleProcessing;
+          
+          // Simulation : accumulation += génération - traitement
+          const deltaTime = 0.1; // 100ms de simulation
+          const newValue = Math.max(0, currentAccumulation + (generation - processing) * deltaTime);
+          
+          newAccumulation.set(node.id, newValue);
+          totalParticles += newValue;
+          
+          // Détecter goulots
+          if (generation > processing) {
+            bottleneckCount++;
+          }
+        }
+      });
+      
+      setNodeAccumulation(newAccumulation);
+      setSimulationStats({
+        totalParticles: Math.round(totalParticles),
+        averageLatency: totalParticles > 0 ? Math.round(totalParticles / currentGraphData.nodes.length * 10) / 10 : 0,
+        bottleneckNodes: bottleneckCount
+      });
+      
+      // Forcer re-rendu du graph avec nouvelles accumulations
+      if (forceGraphRef.current) {
+        forceGraphRef.current.nodeVal(undefined); // Force refresh
+      }
+    }, 100); // Mise à jour toutes les 100ms
+    
+    return () => clearInterval(interval);
+  }, [simulationRunning, currentGraphData, nodeAccumulation]);
 
   // Fonction pour mettre à jour l'espacement des nœuds
   const updateNodeSpacing = useCallback(() => {
@@ -1147,17 +1253,30 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       // Force de liaison (distance entre nœuds connectés)
       const linkForce = graph.d3Force('link');
       if (linkForce) {
-        linkForce.distance(nodeSpacing);
+        linkForce.distance(nodeSpacing * 2); // Doubler l'effet pour plus de visibilité
       }
       
       // Force de charge (répulsion entre tous les nœuds)
       const chargeForce = graph.d3Force('charge');
       if (chargeForce) {
-        chargeForce.strength(-nodeSpacing * 4); // Proportionnel à l'espacement
+        chargeForce.strength(-nodeSpacing * 8); // Augmenter l'effet de répulsion
       }
       
-      // Redémarrer la simulation pour appliquer les nouvelles forces
+      // Force de centrage pour éviter la dispersion
+      const centerForce = graph.d3Force('center');
+      if (centerForce) {
+        centerForce.strength(0.1); // Force de centrage légère
+      }
+      
+      // Redémarrer la simulation avec plus d'intensité
       graph.d3ReheatSimulation();
+      
+      // Relancer la simulation avec plus d'itérations pour un effet plus rapide
+      setTimeout(() => {
+        if (graph.d3Force) {
+          graph.d3ReheatSimulation();
+        }
+      }, 100);
     }
   }, [nodeSpacing]);
 
@@ -1296,6 +1415,147 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
   // Effet pour initialiser/réinitialiser le graphique
   useEffect(() => {
+    // Fonction d'initialisation du graphique 3D
+    const initializeGraph = async () => {
+      if (!graphRef.current || !isValid) return;
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Nettoyage de l'instance précédente
+        if (forceGraphRef.current) {
+          forceGraphRef.current._destructor();
+          forceGraphRef.current = null;
+        }
+
+        // Parsage du contenu DOT avec le backend
+        const graphData = await DotTo3DConverter.parseDotToGraphData(dotContent);
+
+        if (!graphData.nodes.length) {
+          setError('Aucun nœud trouvé dans le graphique');
+          return;
+        }
+
+        // Création de l'instance 3D
+        const graph = ForceGraph3D()(graphRef.current!)
+          .graphData(graphData)
+          .width(dimensions.width)
+          .height(dimensions.height)
+          .backgroundColor('#1a1a1a')
+          .showNavInfo(false)
+          .enableNodeDrag(true)
+          .enableNavigationControls(true)
+          .cooldownTicks(0)
+          .onEngineStop(() => {
+            console.log('Moteur physique arrêté');
+          });
+
+        // Sauvegarder la référence pour le nettoyage
+        forceGraphRef.current = graph;
+
+        // Configuration avancée des nœuds avec support des géométries 3D
+        graph
+          .nodeLabel(() => '') 
+          .nodeVal((node: any) => {
+            if (node.geometry) {
+              return 0; 
+            }
+            
+            let baseSize = nodeSize;
+            if (node.particleGeneration) {
+              baseSize = Math.max(4, Math.min(12, 4 + node.particleGeneration / 50));
+            }
+            
+            return baseSize;
+          })
+          .nodeColor((node: any) => node.color || '#4fc3f7')
+          .nodeThreeObject(nodeThreeObjectCallback)
+          .linkLabel((link: any) => showLinkText && link.name ? link.name : '')
+          .linkThreeObjectExtend(true)
+          .linkThreeObject((link: any) => {
+            if (!showLinkText || !link.name) return;
+            
+            const sprite = new SpriteText(link.name);
+            sprite.color = link.color || '#ffffff';
+            sprite.textHeight = 1.5;
+            // Pas de backgroundColor pour éviter le cadre noir
+            sprite.padding = 1;
+            sprite.borderRadius = 1;
+            
+            // Configuration du matériau pour la gestion de la profondeur
+            if (sprite.material) {
+              sprite.material.depthTest = true;
+              sprite.material.depthWrite = false;
+              sprite.material.transparent = true;
+              sprite.material.alphaTest = 0.1;
+              // Ordre de rendu plus élevé pour que les liens apparaissent derrière les nœuds
+              sprite.renderOrder = -1;
+            }
+            
+            return sprite;
+          })
+          .linkPositionUpdate((sprite: any, { start, end }: any) => {
+            if (!sprite || !showLinkText) return;
+            
+            const middlePos = {
+              x: start.x + (end.x - start.x) / 2,
+              y: start.y + (end.y - start.y) / 2,
+              z: start.z + (end.z - start.z) / 2
+            };
+            
+            Object.assign(sprite.position, middlePos);
+          })
+          .linkColor((link: any) => link.color || '#999999')
+          .linkWidth(linkWidth)
+          .linkCurvature(linkCurvature)
+          .linkCurveRotation(Math.PI / 4)
+          .linkDirectionalArrowLength(showArrows ? Math.max(20, linkWidth * 8) : 0)
+          .linkDirectionalArrowRelPos(0.95)
+          .linkDirectionalArrowColor(() => '#FF0000') // Rouge vif pour debug
+          .linkDirectionalArrowResolution(12)
+          .linkOpacity((link: any) => {
+            if (link.style === 'dashed') return 0.6;
+            if (link.style === 'dotted') return 0.4;
+            return 0.8;
+          })
+          .linkDirectionalParticles((link: any) => {
+            if (!showParticles) return 0;
+            if (emitParticles && link.maxParticleFlow) {
+              return Math.min(8, Math.max(1, Math.floor(link.maxParticleFlow / 10)));
+            }
+            return showParticles ? 2 : 0;
+          })
+          .linkDirectionalParticleSpeed(0.01)
+          .linkDirectionalParticleColor(() => '#ffff00');
+
+        // Stats de rendu
+        const updateStats = () => {
+          setRenderStats({
+            nodes: graphData.nodes.length,
+            links: graphData.links.length,
+            fps: 60
+          });
+        };
+        
+        graph.onEngineStop(updateStats);
+        updateStats();
+
+        // Appliquer les paramètres initiaux
+        setTimeout(() => {
+          updateNodeSpacing();
+          updateLinkProperties();
+          updateParticleProperties();
+        }, 100);
+
+      } catch (err) {
+        console.error('Erreur lors de l\'initialisation du graphique 3D:', err);
+        setError('Erreur lors du rendu 3D: ' + (err as Error).message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (isValid && dotContent) {
       initializeGraph();
     }
@@ -1305,7 +1565,8 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         forceGraphRef.current._destructor();
       }
     };
-  }, [initializeGraph, isValid, dotContent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isValid, dotContent, dimensions.width, dimensions.height]);
 
   // Interface de rendu
   if (!isValid) {
@@ -1493,6 +1754,45 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
                   >
                     Émission particules
                   </Button>
+                  <Button
+                    variant={simulationRunning ? "contained" : "outlined"}
+                    onClick={() => setSimulationRunning(!simulationRunning)}
+                    startIcon={simulationRunning ? <PauseIcon /> : <PlayArrowIcon />}
+                    size="small"
+                    sx={{ 
+                      justifyContent: 'flex-start',
+                      color: simulationRunning ? 'success.main' : 'primary.main'
+                    }}
+                  >
+                    {simulationRunning ? 'Pause' : 'Start'} Simulation
+                  </Button>
+                  
+                  {/* Statistiques temps réel */}
+                  {simulationRunning && (
+                    <Box sx={{ 
+                      mt: 1, 
+                      p: 1, 
+                      bgcolor: 'background.paper', 
+                      borderRadius: 1, 
+                      border: '1px solid',
+                      borderColor: 'divider'
+                    }}>
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        Statistiques Temps Réel
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}>
+                        <Typography variant="caption" color="success.main">
+                          Particules totales: {simulationStats.totalParticles}
+                        </Typography>
+                        <Typography variant="caption" color="warning.main">
+                          Latence moyenne: {simulationStats.averageLatency}ms
+                        </Typography>
+                        <Typography variant="caption" color="error.main">
+                          Goulots d'étranglement: {simulationStats.bottleneckNodes}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
                 </Box>
               </AccordionDetails>
             </Accordion>
