@@ -25,7 +25,7 @@ import {
 import {
   Close,
   CheckCircle,
-  Error,
+  Error as ErrorIcon,
   Warning,
   Info,
   Notifications,
@@ -75,7 +75,7 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export const useNotifications = (): NotificationContextType => {
   const context = useContext(NotificationContext);
   if (!context) {
-    throw new (Error as any)('useNotifications must be used within a NotificationProvider');
+    throw new Error('useNotifications must be used within a NotificationProvider');
   }
   return context;
 };
@@ -192,7 +192,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       case 'success':
         return <CheckCircle color="success" {...iconProps} />;
       case 'error':
-        return <Error color="error" {...iconProps} />;
+        return <ErrorIcon color="error" {...iconProps} />;
       case 'warning':
         return <Warning color="warning" {...iconProps} />;
       case 'info':

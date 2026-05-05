@@ -10,7 +10,7 @@ const mockGetCurrentUser = jest.fn();
 const mockLogin = jest.fn();
 const mockRegister = jest.fn();
 const mockLogout = jest.fn();
-const mockHandleApiError = jest.fn((err: any) => err?.message ?? 'unknown');
+const mockHandleApiError = jest.fn((...args: any[]) => args[0]?.message ?? 'unknown');
 
 jest.mock('../services/api', () => ({
   __esModule: true,

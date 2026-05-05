@@ -16,7 +16,7 @@ const mockParseDot = jest.fn();
 const mockStartSim = jest.fn();
 const mockStopSim = jest.fn();
 const mockPauseSim = jest.fn();
-const mockHandleApiError = jest.fn(() => 'mapped');
+const mockHandleApiError = jest.fn((..._args: any[]) => 'mapped');
 
 jest.mock('../services/api', () => ({
   __esModule: true,
@@ -64,7 +64,7 @@ beforeEach(() => {
     mockStartSim, mockStopSim, mockPauseSim,
     mockWsUpdateGraph, mockWsStartSim, mockWsStopSim, mockWsPauseSim,
   ].forEach((m) => m.mockReset());
-  mockHandleApiError.mockClear().mockImplementation(() => 'mapped');
+  mockHandleApiError.mockClear().mockImplementation((..._args: any[]) => 'mapped');
 });
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -150,7 +150,7 @@ describe('createGraph', () => {
     const { result } = renderHook(() => useGraph(), { wrapper });
     let outcome = false;
     await act(async () => {
-      outcome = await result.current.createGraph({ title: 'X' });
+      outcome = await result.current.createGraph({ title: 'X' } as any);
     });
     expect(outcome).toBe(true);
     expect(result.current.state.currentGraph).toBe(g);
@@ -162,7 +162,7 @@ describe('createGraph', () => {
     const { result } = renderHook(() => useGraph(), { wrapper });
     let outcome = true;
     await act(async () => {
-      outcome = await result.current.createGraph({ title: '' });
+      outcome = await result.current.createGraph({ title: '' } as any);
     });
     expect(outcome).toBe(false);
     expect(result.current.state.error).toBe('bad title');
@@ -180,7 +180,7 @@ describe('updateGraph', () => {
     const { result } = renderHook(() => useGraph(), { wrapper });
     let outcome = false;
     await act(async () => {
-      outcome = await result.current.updateGraph(1, { title: 'New' });
+      outcome = await result.current.updateGraph(1, { title: 'New' } as any);
     });
     expect(outcome).toBe(true);
     expect(mockWsUpdateGraph).toHaveBeenCalledWith(1, { title: 'New' });
@@ -192,7 +192,7 @@ describe('updateGraph', () => {
     const { result } = renderHook(() => useGraph(), { wrapper });
     let outcome = true;
     await act(async () => {
-      outcome = await result.current.updateGraph(1, { title: 'New' });
+      outcome = await result.current.updateGraph(1, { title: 'New' } as any);
     });
     expect(outcome).toBe(false);
     expect(mockWsUpdateGraph).not.toHaveBeenCalled();
