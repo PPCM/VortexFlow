@@ -1,0 +1,183 @@
+// Test des attributs globaux DOT 3D
+// Ce fichier teste l'implémentation des attributs globaux dans la grammaire DOT 3D étendue
+
+digraph GlobalAttributesTest {
+    // === ATTRIBUTS GLOBAUX ===
+    // Configuration globale pour tout le graphique
+    graph [
+        defaultNodeSize=10,
+        autoColors=true,
+        autoResize=true,
+        particlesEnabled=true,
+        bloomEffect=true
+    ];
+    
+    // === NOEUDS AVEC GEOMETRIES 3D ===
+    // Serveur principal (utilise defaultNodeSize=10 du global)
+    MainServer [
+        label="Main Server",
+        geometry="3d-box",
+        dimensions="width=12,height=8,depth=6",
+        color="#ff6b6b",
+        particleGeneration=100,
+        maxParticleProcessing=80,
+        bloomEffect=true
+    ];
+    
+    // Base de données (sphere avec taille personnalisée)
+    Database [
+        label="Database",
+        geometry="3d-sphere",
+        dimensions="radius=8",
+        color="#4ecdc4",
+        particleGeneration=60,
+        maxParticleProcessing=120,
+        bloomEffect=true
+    ];
+    
+    // Serveurs web (utilisent defaultNodeSize global)
+    WebServer1 [
+        label="Web Server 1",
+        geometry="3d-cylinder",
+        dimensions="radius=6,height=10",
+        color="#45b7d1",
+        particleGeneration=40,
+        maxParticleProcessing=50
+    ];
+    
+    WebServer2 [
+        label="Web Server 2", 
+        geometry="3d-cylinder",
+        dimensions="radius=6,height=10",
+        color="#45b7d1",
+        particleGeneration=35,
+        maxParticleProcessing=45
+    ];
+    
+    // Cache Redis
+    CacheServer [
+        label="Redis Cache",
+        geometry="3d-octahedron",
+        dimensions="radius=5",
+        color="#f7b801",
+        particleGeneration=80,
+        maxParticleProcessing=150,
+        bloomEffect=true
+    ];
+    
+    // Clients (nœuds simples utilisant defaultNodeSize)
+    Client1 [label="Client 1", color="#95e1d3"];
+    Client2 [label="Client 2", color="#95e1d3"];
+    Client3 [label="Client 3", color="#95e1d3"];
+    
+    // === CONNEXIONS AVEC PARTICULES ===
+    // Flux principal (high traffic)
+    MainServer -> Database [
+        label="Query DB",
+        color="#ff6b6b",
+        maxParticleFlow=15,
+        particleSpeed=2.0,
+        style="solid"
+    ];
+    
+    Database -> MainServer [
+        label="Return Data",
+        color="#4ecdc4", 
+        maxParticleFlow=12,
+        particleSpeed=1.8,
+        style="solid"
+    ];
+    
+    // Cache access (très rapide)
+    MainServer -> CacheServer [
+        label="Cache Read",
+        color="#f7b801",
+        maxParticleFlow=25,
+        particleSpeed=3.0,
+        style="dashed"
+    ];
+    
+    CacheServer -> MainServer [
+        label="Cache Data",
+        color="#f7b801",
+        maxParticleFlow=20,
+        particleSpeed=2.5,
+        style="dashed"
+    ];
+    
+    // Load balancing vers web servers
+    MainServer -> WebServer1 [
+        label="Route Request",
+        color="#45b7d1",
+        maxParticleFlow=8,
+        particleSpeed=1.5,
+        style="solid"
+    ];
+    
+    MainServer -> WebServer2 [
+        label="Route Request",
+        color="#45b7d1", 
+        maxParticleFlow=7,
+        particleSpeed=1.4,
+        style="solid"
+    ];
+    
+    // Client connections
+    Client1 -> WebServer1 [
+        label="HTTP Request",
+        color="#95e1d3",
+        maxParticleFlow=3,
+        particleSpeed=1.0,
+        style="dotted"
+    ];
+    
+    Client2 -> WebServer1 [
+        label="HTTP Request", 
+        color="#95e1d3",
+        maxParticleFlow=4,
+        particleSpeed=1.1,
+        style="dotted"
+    ];
+    
+    Client3 -> WebServer2 [
+        label="HTTP Request",
+        color="#95e1d3",
+        maxParticleFlow=5,
+        particleSpeed=1.2,
+        style="dotted"
+    ];
+    
+    // Response flows
+    WebServer1 -> Client1 [
+        label="HTTP Response",
+        color="#45b7d1",
+        maxParticleFlow=2,
+        particleSpeed=0.8,
+        style="dotted"
+    ];
+    
+    WebServer1 -> Client2 [
+        label="HTTP Response",
+        color="#45b7d1", 
+        maxParticleFlow=3,
+        particleSpeed=0.9,
+        style="dotted"
+    ];
+    
+    WebServer2 -> Client3 [
+        label="HTTP Response",
+        color="#45b7d1",
+        maxParticleFlow=4,
+        particleSpeed=1.0,
+        style="dotted"
+    ];
+    
+    // Cache update from database
+    Database -> CacheServer [
+        label="Cache Update",
+        color="#4ecdc4",
+        maxParticleFlow=6,
+        particleSpeed=1.5,
+        style="dashed"
+    ];
+}

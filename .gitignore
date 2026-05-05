@@ -8,6 +8,14 @@ CLAUDE.md
 CLAUDE.local.md
 
 # =====================================
+# Logs et sorties de processus
+# =====================================
+nohup.out
+**/nohup.out
+*.log
+**/*.log
+
+# =====================================
 # Variables d'environnement et secrets
 # =====================================
 .env

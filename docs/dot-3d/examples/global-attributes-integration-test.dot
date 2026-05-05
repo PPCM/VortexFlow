@@ -1,0 +1,86 @@
+digraph global_attributes_test {
+  graph [
+    defaultNodeSize=10,
+    autoColors=true,
+    autoResize=false,
+    particlesEnabled=true,
+    bloomEffect=true
+  ];
+  
+  // Configuration des nœuds par défaut
+  node [
+    style=filled,
+    fontcolor=white
+  ];
+  
+  // Configuration des arêtes par défaut  
+  edge [
+    color=gray50,
+    fontsize=12
+  ];
+  
+  // Nœuds avec différentes propriétés
+  A [
+    label="Node A\n(Large)",
+    particleGeneration=5,
+    geometry="3d-sphere",
+    dimensions="{radius: 8}",
+    color=red
+  ];
+  
+  B [
+    label="Node B\n(Medium)",
+    particleGeneration=3,
+    geometry="3d-box", 
+    dimensions="{width: 6, height: 6, depth: 6}",
+    color=blue
+  ];
+  
+  C [
+    label="Node C\n(Small)",
+    particleGeneration=1,
+    color=green
+  ];
+  
+  D [
+    label="Node D\n(Particles Off)",
+    particleGeneration=0,
+    geometry="3d-cylinder",
+    dimensions="{radius: 4, height: 8}",
+    color=purple
+  ];
+  
+  // Connexions avec particules et labels
+  A -> B [
+    label="High Speed",
+    particleSpeed=3,
+    particleCount=10,
+    color=orange
+  ];
+  
+  B -> C [
+    label="Medium Flow", 
+    particleSpeed=2,
+    particleCount=5,
+    color=cyan
+  ];
+  
+  C -> D [
+    label="Low Flow",
+    particleSpeed=1,
+    particleCount=2,
+    color=pink
+  ];
+  
+  D -> A [
+    label="Return Path",
+    particleSpeed=4,
+    particleCount=8,
+    color=yellow,
+    style="dashed"
+  ];
+  
+  // Quelques connexions supplémentaires pour tester l'effet global
+  A -> C [label="Direct", particleCount=3];
+  B -> D [label="Bypass", particleCount=4];
+}

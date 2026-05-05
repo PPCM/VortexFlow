@@ -1,0 +1,17 @@
+digraph global_validation {
+  graph [
+    defaultNodeSize=12,
+    autoColors=true,
+    autoResize=false,
+    particlesEnabled=false,
+    bloomEffect=true
+  ];
+  
+  // Test simple : 4 nœuds connectés en carré
+  A [label="Node A"];
+  B [label="Node B"];  
+  C [label="Node C"];
+  D [label="Node D"];
+  
+  A -> B -> C -> D -> A;
+}
