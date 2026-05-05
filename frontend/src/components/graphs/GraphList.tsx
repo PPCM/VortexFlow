@@ -125,7 +125,7 @@ const GraphList: React.FC = () => {
   };
 
   const handleCreateNew = () => {
-    navigate('/graphs/new');
+    navigate('/graphs/create');
   };
 
   // =====================================

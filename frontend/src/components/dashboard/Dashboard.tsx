@@ -109,7 +109,7 @@ const Dashboard: React.FC = () => {
   // Gestionnaires d'événements
   // =====================================
   const handleCreateGraph = () => {
-    navigate('/graphs/new');
+    navigate('/graphs/create');
   };
 
   const handleViewAllGraphs = () => {

@@ -112,7 +112,8 @@ digraph example {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleHover, setTitleHover] = useState(false);
 
-  const isNewGraph = id === 'new';
+  // Route /graphs/create yields id === undefined; route /graphs/:id/edit yields the id.
+  const isNewGraph = !id;
   const currentGraph = state.currentGraph;
 
   // =====================================
@@ -196,11 +197,13 @@ digraph example {
 
   const handleSave = async () => {
     try {
-      const graphData = {
-        name: graphName,
+      // Backend payload contract: title / dotCode / isPublic (camelCase),
+      // not name / dot_content / is_public.
+      const graphData: any = {
+        title: graphName,
         description: graphDescription,
-        is_public: isPublic,
-        dot_content: dotContent,
+        isPublic,
+        dotCode: dotContent,
       };
 
       if (isNewGraph) {

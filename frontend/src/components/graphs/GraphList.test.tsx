@@ -93,10 +93,10 @@ describe('GraphList', () => {
     expect(screen.queryByRole('button', { name: /Nouveau Graphique/i })).not.toBeInTheDocument();
   });
 
-  test('clicking "Nouveau Graphique" navigates to /graphs/new', () => {
+  test('clicking "Nouveau Graphique" navigates to /graphs/create', () => {
     render(<GraphList />);
     userEvent.click(screen.getByRole('button', { name: /Nouveau Graphique/i }));
-    expect(mockNavigate).toHaveBeenCalledWith('/graphs/new');
+    expect(mockNavigate).toHaveBeenCalledWith('/graphs/create');
   });
 
   test('triggers loadGraphs on mount with current filters', async () => {

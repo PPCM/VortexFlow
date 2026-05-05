@@ -205,7 +205,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </Typography>
             <ListItem disablePadding sx={{ mt: 1 }}>
               <ListItemButton
-                onClick={() => handleNavigation('/graphs/new')}
+                onClick={() => handleNavigation('/graphs/create')}
                 sx={{
                   borderRadius: 2,
                   minHeight: 48,
