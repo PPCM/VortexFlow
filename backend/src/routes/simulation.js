@@ -196,9 +196,9 @@ router.post('/start',
       throw new AppError('Graph not found', 404, 'GRAPH_NOT_FOUND');
     }
 
-    // Check if user has access to this graph
-    const hasAccess = await graph.hasUserAccess(req.user.id);
-    if (!hasAccess) {
+    // Check if user has access to this graph (Graph model exposes
+    // canBeAccessedBy(user); the previously used `hasUserAccess` did not exist).
+    if (!graph.canBeAccessedBy(req.user)) {
       throw new AppError('Access denied to this graph', 403, 'ACCESS_DENIED');
     }
 
@@ -236,13 +236,16 @@ router.post('/start',
 
     const mergedConfig = { ...defaultConfig, ...config };
 
-    // Create simulation session
+    // Create simulation session.
+    // - status enum is ('running', 'paused', 'completed', 'failed'); the WS
+    //   handler picks up the row and starts the engine immediately.
+    // - The persisted config field is `simulation_config`, not `config`.
     const session = await SimulationSession.create({
       user_id: req.user.id,
       graph_id: graphId,
       session_name: sessionName || `Simulation ${new Date().toISOString()}`,
-      status: 'pending',
-      config: mergedConfig,
+      status: 'running',
+      simulation_config: mergedConfig,
       start_time: new Date()
     });
 
@@ -262,9 +265,9 @@ router.post('/start',
         id: session.id,
         sessionName: session.session_name,
         status: session.status,
-        config: session.config,
+        config: session.simulation_config,
         startTime: session.start_time,
-        createdAt: session.created_at
+        createdAt: session.createdAt
       }
     });
   })

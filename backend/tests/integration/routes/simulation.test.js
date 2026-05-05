@@ -70,7 +70,7 @@ const makeGraph = (overrides = {}) => ({
   id: VALID_UUID,
   user_id: TEST_USER.id,
   title: 'G',
-  hasUserAccess: jest.fn().mockResolvedValue(true),
+  canBeAccessedBy: jest.fn().mockReturnValue(true),
   update: jest.fn().mockResolvedValue(undefined),
   ...overrides,
 });
@@ -176,7 +176,7 @@ describe('POST /api/simulation/start', () => {
 
   test('403 when user has no access to the graph', async () => {
     mockGraphFindByPk.mockResolvedValue(
-      makeGraph({ hasUserAccess: jest.fn().mockResolvedValue(false) }),
+      makeGraph({ canBeAccessedBy: jest.fn().mockReturnValue(false) }),
     );
     const res = await request(buildApp())
       .post('/api/simulation/start')
@@ -199,7 +199,7 @@ describe('POST /api/simulation/start', () => {
     const graph = makeGraph();
     mockGraphFindByPk.mockResolvedValue(graph);
     mockSessionFindOne.mockResolvedValue(null);
-    mockSessionCreate.mockResolvedValue(makeSession({ status: 'pending' }));
+    mockSessionCreate.mockResolvedValue(makeSession({ status: 'running' }));
 
     const res = await request(buildApp())
       .post('/api/simulation/start')
@@ -217,13 +217,15 @@ describe('POST /api/simulation/start', () => {
       user_id: TEST_USER.id,
       graph_id: VALID_UUID,
       session_name: 'Test run',
-      status: 'pending',
+      // status enum is ('running','paused','completed','failed') — no 'pending'.
+      status: 'running',
     }));
-    // User overrides win, defaults still merged.
-    expect(created.config.speed).toBe(2);
-    expect(created.config.particleCount).toBe(200);
-    expect(created.config.duration).toBe(60); // default kept
-    expect(created.config.physics).toBeDefined();
+    // User overrides win, defaults still merged. Config is persisted under
+    // simulation_config (the `config` attribute is not a model field).
+    expect(created.simulation_config.speed).toBe(2);
+    expect(created.simulation_config.particleCount).toBe(200);
+    expect(created.simulation_config.duration).toBe(60); // default kept
+    expect(created.simulation_config.physics).toBeDefined();
 
     expect(graph.update).toHaveBeenCalledWith(
       expect.objectContaining({ last_simulation: expect.any(Date) }),
