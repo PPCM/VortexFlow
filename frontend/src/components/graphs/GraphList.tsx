@@ -272,21 +272,22 @@ const GraphList: React.FC = () => {
                     Aperçu 3D
                   </Typography>
                   
-                  {/* Indicateur de visibilité */}
+                  {/* Indicateur de visibilité — backend renvoie isPublic (camelCase) */}
                   <Chip
-                    icon={graph.is_public ? <Public /> : <Lock />}
-                    label={graph.is_public ? 'Public' : 'Privé'}
+                    icon={(graph as any).isPublic ? <Public /> : <Lock />}
+                    label={(graph as any).isPublic ? 'Public' : 'Privé'}
                     size="small"
-                    color={graph.is_public ? 'success' : 'default'}
+                    color={(graph as any).isPublic ? 'success' : 'default'}
                     sx={{ position: 'absolute', top: 8, right: 8 }}
                   />
                 </Box>
 
                 <CardContent sx={{ flexGrow: 1 }}>
+                  {/* Backend renvoie `title`, pas `name` */}
                   <Typography variant="h6" gutterBottom noWrap>
-                    {graph.name}
+                    {(graph as any).title || (graph as any).name || 'Sans titre'}
                   </Typography>
-                  
+
                   <Typography
                     variant="body2"
                     color="text.secondary"
@@ -301,22 +302,36 @@ const GraphList: React.FC = () => {
                     {graph.description || 'Aucune description'}
                   </Typography>
 
-                  <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                    <Chip
-                      label={`${(graph.data?.nodes || []).length} nœuds`}
-                      size="small"
-                      variant="outlined"
-                    />
-                    <Chip
-                      label={`${(graph.data?.edges || []).length} arêtes`}
-                      size="small"
-                      variant="outlined"
-                    />
-                  </Box>
+                  {/*
+                   * Le payload de la liste ne contient pas les nœuds/arêtes
+                   * parsés. On n'affiche les chips que si on a au moins un
+                   * count plutôt que d'afficher des "0 nœuds" mensongers.
+                   */}
+                  {((graph as any).data?.nodes?.length || (graph as any).data?.edges?.length) ? (
+                    <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                      <Chip
+                        label={`${((graph as any).data?.nodes || []).length} nœuds`}
+                        size="small"
+                        variant="outlined"
+                      />
+                      <Chip
+                        label={`${((graph as any).data?.edges || []).length} arêtes`}
+                        size="small"
+                        variant="outlined"
+                      />
+                    </Box>
+                  ) : null}
 
-                  <Typography variant="caption" color="text.secondary">
-                    Modifié le {new Date(graph.updated_at).toLocaleDateString()}
-                  </Typography>
+                  {/* Backend renvoie updatedAt (camelCase) */}
+                  {(() => {
+                    const ts = (graph as any).updatedAt || (graph as any).updated_at;
+                    const d = ts ? new Date(ts) : null;
+                    return d && !isNaN(d.getTime()) ? (
+                      <Typography variant="caption" color="text.secondary">
+                        Modifié le {d.toLocaleDateString()}
+                      </Typography>
+                    ) : null;
+                  })()}
                 </CardContent>
 
                 <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
