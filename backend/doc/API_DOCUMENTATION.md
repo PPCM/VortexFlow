@@ -6,7 +6,7 @@
 
 ## 🎯 Vue d'Ensemble
 
-L'API VortexFlow fournit une interface REST complète pour la gestion de graphiques DOT avec visualisation 3D, authentification multi-rôles et simulation temps réel.
+L'API VortexFlow fournit une interface REST complète pour la gestion de graphiques DOT avec visualisation 3D et authentification multi-rôles. La simulation de flux est entièrement effectuée côté navigateur (Three.js / 3d-force-graph) — le backend n'expose plus d'endpoints `/api/simulation` ni de WebSocket dédié.
 
 ### 🔐 Authentification
 - **Type:** Sessions serveur avec cookies
@@ -221,36 +221,14 @@ Content-Type: application/json
 DELETE /api/graphs/:id
 ```
 
-### 🎮 Simulation (Authentification Requise)
+### 🎮 Simulation
 
-#### Sessions Simulation
-```http
-GET /api/simulation/sessions
-```
-
-#### Démarrer Simulation
-```http
-POST /api/simulation/start
-Content-Type: application/json
-
-{
-  "graph_id": "uuid",
-  "settings": {
-    "speed": 1.0,
-    "particle_count": 100
-  }
-}
-```
-
-#### Arrêter Simulation
-```http
-POST /api/simulation/stop
-Content-Type: application/json
-
-{
-  "session_id": "uuid"
-}
-```
+> **Désactivée côté serveur.** La simulation est calculée et rendue
+> entièrement dans le navigateur (Three.js + 3d-force-graph). Il n'existe
+> plus d'endpoint `/api/simulation/*` ni de WebSocket dédié. Le modèle
+> Sequelize `SimulationSession` est encore présent (les compteurs admin /
+> dashboard l'interrogent et renvoient 0) mais aucun nouveau record n'est
+> créé.
 
 ### 📁 Import/Export (Authentification Requise)
 

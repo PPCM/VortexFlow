@@ -62,12 +62,8 @@ PUT    /api/graphs/:id         # Modifier graphique
 DELETE /api/graphs/:id         # Supprimer graphique
 ```
 
-### 🎮 Simulation (Auth requise)
-```http
-GET  /api/simulation/sessions  # Sessions simulation
-POST /api/simulation/start     # Démarrer simulation
-POST /api/simulation/stop      # Arrêter simulation
-```
+### 🎮 Simulation
+La simulation tourne 100 % côté navigateur — pas d'endpoint serveur.
 
 ### 📁 Import/Export (Auth requise)
 ```http

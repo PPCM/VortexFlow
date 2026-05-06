@@ -17,14 +17,19 @@ import Navigation from './components/layout/Navigation';
 import LoadingPage from './components/common/LoadingPage';
 
 // Pages et composants
+// Auth pages stay eager — they're tiny, render before login, and avoid a
+// loading flash on the first visit.
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import Dashboard from './components/dashboard/Dashboard';
 import GraphList from './components/graphs/GraphList';
-import GraphEditor from './components/graphs/GraphEditor';
-import GraphViewer from './components/graphs/GraphViewer';
 import UserProfile from './components/user/UserProfile';
-import AdminPanel from './components/admin/AdminPanel';
+// The editor and viewer pull in Monaco, CodeMirror, three.js and
+// 3d-force-graph (~2.5MB combined) — code-split them so users who only
+// browse never download the heavy editor / renderer chunks.
+const GraphEditor = React.lazy(() => import('./components/graphs/GraphEditor'));
+const GraphViewer = React.lazy(() => import('./components/graphs/GraphViewer'));
+const AdminPanel = React.lazy(() => import('./components/admin/AdminPanel'));
 
 // Hooks et utilitaires
 import { useAuth } from './context/AuthContext';
@@ -231,6 +236,7 @@ const App: React.FC = () => {
               <SimulationProvider>
                 <NotificationProvider>
                 <AppLayout>
+                  <React.Suspense fallback={<LoadingPage message="Chargement..." />}>
                   <Routes>
                     {/* Routes publiques */}
                     <Route
@@ -363,6 +369,7 @@ const App: React.FC = () => {
                       }
                     />
                   </Routes>
+                  </React.Suspense>
                 </AppLayout>
                 </NotificationProvider>
               </SimulationProvider>

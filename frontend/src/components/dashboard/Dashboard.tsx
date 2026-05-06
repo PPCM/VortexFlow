@@ -337,7 +337,14 @@ const Dashboard: React.FC = () => {
                                 sx={{ height: 20, fontSize: '0.75rem' }}
                               />
                               <Typography variant="caption" color="text.secondary">
-                                Modifié {new Date(graph.updated_at).toLocaleDateString()}
+                                {(() => {
+                                  // Backend ships camelCase (updatedAt); legacy snake_case kept as fallback.
+                                  const raw = (graph as any).updatedAt || (graph as any).updated_at;
+                                  const d = raw ? new Date(raw) : null;
+                                  return d && !Number.isNaN(d.valueOf())
+                                    ? `Modifié ${d.toLocaleDateString()}`
+                                    : '';
+                                })()}
                               </Typography>
                             </Box>
                           }

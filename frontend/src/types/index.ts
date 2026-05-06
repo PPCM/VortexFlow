@@ -433,38 +433,8 @@ export interface SimulationControlsProps {
 // =====================================
 // Types Système et Administration
 // =====================================
-export interface SystemStats {
-  uptime: number;
-  memory: {
-    used: number;
-    total: number;
-    percentage: number;
-  };
-  cpu: {
-    usage: number;
-    load: number[];
-  };
-  database: {
-    connections: number;
-    queries: number;
-    avgResponseTime: number;
-  };
-  redis: {
-    memoryUsage: number;
-    connectedClients: number;
-    keyCount: number;
-  };
-  users: {
-    total: number;
-    online: number;
-    registered24h: number;
-  };
-  graphs: {
-    total: number;
-    created24h: number;
-    avgSize: number;
-  };
-}
+// (SystemStats is already declared earlier in this file — single-source of
+// truth kept above to avoid the no-redeclare lint error.)
 
 export interface SystemLogs {
   id: number;
