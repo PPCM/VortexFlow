@@ -337,72 +337,38 @@ export const GraphProvider: React.FC<GraphProviderProps> = ({ children }) => {
   // =====================================
   // Actions Simulation
   // =====================================
+  // Simulation is rendered fully in the browser (Three.js scene + per-frame
+  // accumulation in GraphRenderer3D). The context just tracks the on/off
+  // state so the toolbar, the in-renderer panel, and the renderer itself
+  // stay in sync. No backend session, no WebSocket — keeps the server idle.
   const startSimulation = useCallback(async (config: SimulationConfig): Promise<void> => {
     if (!state.currentGraph) return;
-
-    try {
-      const response = await apiService.startSimulation({
-        graphId: state.currentGraph.id.toString(),
-        config
-      });
-      
-      if (response.success) {
-        const simulationState: SimulationState = {
-          sessionId: response.data?.id,
-          config: { ...config, isRunning: true },
-          particles: [],
-          statistics: {
-            totalParticles: 0,
-            activeParticles: 0,
-            totalFlows: 0,
-            averageSpeed: 0,
-          }
-        };
-
-        dispatch({ type: 'SET_SIMULATION', payload: simulationState });
-        
-        // Démarrer via WebSocket
-        webSocketService.startSimulation(state.currentGraph.id, config);
-      } else {
-        dispatch({ type: 'SET_ERROR', payload: response.message || 'Erreur de démarrage simulation' });
-      }
-    } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: apiService.handleApiError(error) });
-    }
+    dispatch({
+      type: 'SET_SIMULATION',
+      payload: {
+        config: { ...config, isRunning: true, isPaused: false },
+        particles: [],
+        statistics: {
+          totalParticles: 0,
+          activeParticles: 0,
+          totalFlows: 0,
+          averageSpeed: 0,
+        },
+      },
+    });
   }, [state.currentGraph]);
 
   const stopSimulation = useCallback(async (): Promise<void> => {
-    if (!state.currentGraph || !state.simulation?.sessionId) return;
-
-    try {
-      await apiService.stopSimulation(state.simulation.sessionId);
-
-      webSocketService.stopSimulation(state.currentGraph.id);
-
-      dispatch({ type: 'SET_SIMULATION', payload: null });
-    } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: apiService.handleApiError(error) });
-    }
-  }, [state.currentGraph, state.simulation]);
+    dispatch({ type: 'SET_SIMULATION', payload: null });
+  }, []);
 
   const pauseSimulation = useCallback(async (): Promise<void> => {
-    if (!state.currentGraph || !state.simulation?.sessionId) return;
-
-    try {
-      await apiService.pauseSimulation(state.simulation.sessionId);
-
-      webSocketService.pauseSimulation(state.currentGraph.id);
-
-      if (state.simulation) {
-        dispatch({
-          type: 'UPDATE_SIMULATION_CONFIG',
-          payload: { isPaused: true }
-        });
-      }
-    } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: apiService.handleApiError(error) });
-    }
-  }, [state.currentGraph, state.simulation]);
+    if (!state.simulation) return;
+    dispatch({
+      type: 'UPDATE_SIMULATION_CONFIG',
+      payload: { isPaused: !state.simulation.config.isPaused },
+    });
+  }, [state.simulation]);
 
   const updateSimulationConfig = useCallback(async (config: Partial<SimulationConfig>): Promise<void> => {
     if (!state.currentGraph) return;

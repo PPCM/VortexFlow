@@ -330,10 +330,11 @@ describe('startSimulation', () => {
     expect(mockStartSim).not.toHaveBeenCalled();
   });
 
-  test('initialises simulation state and notifies WebSocket on success', async () => {
+  // The simulation runs entirely client-side now (no backend session, no
+  // WebSocket dispatch). The context only mirrors the on/off state.
+  test('initialises simulation state with isRunning=true', async () => {
     const g = fakeGraph();
     mockGetGraph.mockResolvedValue({ success: true, data: g });
-    mockStartSim.mockResolvedValue({ success: true });
 
     const { result } = renderHook(() => useGraph(), { wrapper });
     await act(async () => { await result.current.loadGraph(1); });
@@ -341,46 +342,42 @@ describe('startSimulation', () => {
       await result.current.startSimulation({ speed: 2 } as any);
     });
 
-    expect(mockStartSim).toHaveBeenCalledWith({
-      graphId: '1', config: { speed: 2 },
-    });
-    expect(mockWsStartSim).toHaveBeenCalledWith(1, { speed: 2 });
+    expect(mockStartSim).not.toHaveBeenCalled();
+    expect(mockWsStartSim).not.toHaveBeenCalled();
     expect(result.current.simulationState).toEqual(expect.objectContaining({
-      config: { speed: 2 },
+      config: expect.objectContaining({ speed: 2, isRunning: true, isPaused: false }),
       particles: [],
     }));
   });
 });
 
 describe('stopSimulation / pauseSimulation', () => {
-  test('stop calls API + WebSocket and updates simulation flag', async () => {
+  test('stop clears the simulation state without backend calls', async () => {
     const g = fakeGraph();
     mockGetGraph.mockResolvedValue({ success: true, data: g });
-    mockStartSim.mockResolvedValue({ success: true });
-    mockStopSim.mockResolvedValue({ success: true });
 
     const { result } = renderHook(() => useGraph(), { wrapper });
     await act(async () => { await result.current.loadGraph(1); });
     await act(async () => { await result.current.startSimulation({ speed: 1 } as any); });
     await act(async () => { await result.current.stopSimulation(); });
 
-    expect(mockStopSim).toHaveBeenCalledWith('1');
-    expect(mockWsStopSim).toHaveBeenCalledWith(1);
+    expect(mockStopSim).not.toHaveBeenCalled();
+    expect(mockWsStopSim).not.toHaveBeenCalled();
+    expect(result.current.simulationState).toBeNull();
   });
 
-  test('pause calls API + WebSocket and updates simulation flag', async () => {
+  test('pause toggles isPaused on the local config', async () => {
     const g = fakeGraph();
     mockGetGraph.mockResolvedValue({ success: true, data: g });
-    mockStartSim.mockResolvedValue({ success: true });
-    mockPauseSim.mockResolvedValue({ success: true });
 
     const { result } = renderHook(() => useGraph(), { wrapper });
     await act(async () => { await result.current.loadGraph(1); });
     await act(async () => { await result.current.startSimulation({ speed: 1 } as any); });
     await act(async () => { await result.current.pauseSimulation(); });
 
-    expect(mockPauseSim).toHaveBeenCalledWith('1');
-    expect(mockWsPauseSim).toHaveBeenCalledWith(1);
+    expect(mockPauseSim).not.toHaveBeenCalled();
+    expect(mockWsPauseSim).not.toHaveBeenCalled();
+    expect(result.current.simulationState?.config.isPaused).toBe(true);
   });
 });
 
@@ -388,7 +385,6 @@ describe('updateSimulationConfig', () => {
   test('merges new config into the simulation state', async () => {
     const g = fakeGraph();
     mockGetGraph.mockResolvedValue({ success: true, data: g });
-    mockStartSim.mockResolvedValue({ success: true });
 
     const { result } = renderHook(() => useGraph(), { wrapper });
     await act(async () => { await result.current.loadGraph(1); });
@@ -397,7 +393,9 @@ describe('updateSimulationConfig', () => {
     await act(async () => {
       await result.current.updateSimulationConfig({ speed: 5 } as any);
     });
-    expect(result.current.simulationState?.config).toEqual({ speed: 5 });
+    expect(result.current.simulationState?.config).toEqual(
+      expect.objectContaining({ speed: 5, isRunning: true }),
+    );
   });
 });
 

@@ -154,6 +154,14 @@ const GraphViewer: React.FC = () => {
     await stopSimulation();
   };
 
+  const handleToggleSimulation = async () => {
+    if (simulationState && simulationState.config.isRunning) {
+      await handleStopSimulation();
+    } else {
+      await handleStartSimulation();
+    }
+  };
+
   const handlePauseSimulation = async () => {
     await pauseSimulation();
   };
@@ -438,6 +446,7 @@ const GraphViewer: React.FC = () => {
               }
               isValid={true}
               isSimulationRunning={simulationState?.config?.isRunning ?? false}
+              onToggleSimulation={handleToggleSimulation}
             />
           </Box>
         </Paper>

@@ -63,6 +63,10 @@ interface GraphRenderer3DProps {
   // Drives the in-renderer simulation: when true, particles emit along links
   // and the per-node accumulation / stats effect runs.
   isSimulationRunning?: boolean;
+  // Optional toggle handler: when provided, the panel's Start/Pause button
+  // delegates to the parent (GraphViewer) instead of flipping a local flag,
+  // so the toolbar icon and the panel button stay in sync.
+  onToggleSimulation?: () => void;
 }
 
 // Types pour la gestion des données 3D étendues
@@ -522,6 +526,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   isValid,
   parsedData,
   isSimulationRunning,
+  onToggleSimulation,
 }) => {
   const graphRef = useRef<HTMLDivElement>(null);
   const forceGraphRef = useRef<any>(null);
@@ -540,7 +545,6 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   const [showParticles, setShowParticles] = useState(true);
   const [showNodeText, setShowNodeText] = useState(true); // Afficher les labels par défaut
   const [showLinkText, setShowLinkText] = useState(true); // Afficher les labels de liens par défaut
-  const [emitParticles, setEmitParticles] = useState(false);
   const [linkCurvature, setLinkCurvature] = useState(0.2); // Intensité des courbes (0 = droite, 1 = très courbée)
   const [linkWidth, setLinkWidth] = useState(0); // Liens invisibles par défaut
   const [nodeSpacing, setNodeSpacing] = useState(30); // Espacement entre nœuds (10 = serré, 100 = espacé)
@@ -555,13 +559,11 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     bottleneckNodes: 0
   });
 
-  // Mirror the global simulation state (driven by the parent's "Démarrer
-  // simulation" button + WebSocket session) into the renderer's local flags
-  // so particles flow on the links and the accumulation effect runs.
+  // Mirror the global simulation state (driven by the toolbar) into the
+  // renderer's local flag so particles flow and the accumulation effect runs.
   useEffect(() => {
     if (isSimulationRunning === undefined) return;
     setSimulationRunning(isSimulationRunning);
-    setEmitParticles(isSimulationRunning);
   }, [isSimulationRunning]);
   
   // États pour les accordéons
@@ -1123,11 +1125,11 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           return 0.8;
         })
         .linkDirectionalParticles((link: any) => {
-          if (!showParticles) return 0;
-          if (emitParticles && link.maxParticleFlow) {
+          if (!showParticles || !simulationRunning) return 0;
+          if (link.maxParticleFlow) {
             return Math.min(8, Math.max(1, Math.floor(link.maxParticleFlow / 10)));
           }
-          return showParticles ? 2 : 0;
+          return 4;
         })
         .linkDirectionalParticleSpeed(0.01)
         .linkDirectionalParticleColor(() => '#ffff00');
@@ -1181,7 +1183,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       // Particles only emit while a simulation is running. Outside of that,
       // every link reports 0 so nothing flows on idle graphs.
       .linkDirectionalParticles((link: any) => {
-        if (!showParticles || !emitParticles) return 0;
+        if (!showParticles || !simulationRunning) return 0;
         if (link.maxParticleFlow && link.maxParticleFlow > 0) {
           return Math.max(1, Math.min(10, Math.floor(link.maxParticleFlow / 20)));
         }
@@ -1210,7 +1212,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       // link.color here: dark link colors (and unlit Lambert fallbacks) made
       // particles render almost black, masking labels behind them.
       .linkDirectionalParticleColor(() => '#ffd54f');
-  }, [showParticles, emitParticles]);
+  }, [showParticles, simulationRunning]);
 
   // Simulation temps réel des accumulations
   useEffect(() => {
@@ -1288,6 +1290,45 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     
     return () => clearInterval(interval);
   }, [simulationRunning, currentGraphData, nodeAccumulation]);
+
+  // One-shot trace: send a single particle from every emitter node and let it
+  // cascade through outgoing links so the user can follow the path without
+  // particles accumulating. Cycles are short-circuited by a visited set.
+  const handleEmitTrace = useCallback(() => {
+    const fg = forceGraphRef.current;
+    if (!fg || typeof fg.emitParticle !== 'function') return;
+    const data = fg.graphData();
+    if (!data?.nodes?.length) return;
+
+    const hasVortexEmitters = data.nodes.some((n: any) => n.particleGeneration > 0);
+    const isEmitter = (node: any) => (
+      hasVortexEmitters ? (node.particleGeneration || 0) > 0 : true
+    );
+
+    const visited = new Set<string>();
+    const fireFrom = (nodeId: string, depth: number) => {
+      if (depth > 15 || visited.has(nodeId)) return;
+      visited.add(nodeId);
+
+      data.links.forEach((link: any) => {
+        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+        if (sourceId !== nodeId) return;
+        fg.emitParticle(link);
+        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+        const speed = link.particleSpeed && link.particleSpeed > 0
+          ? Math.max(0.001, Math.min(0.02, link.particleSpeed * 0.003))
+          : 0.008;
+        // 1/speed = ticks until arrival (the engine moves the particle by `speed`
+        // of the link's length per tick); ~16.67ms per tick at 60fps.
+        const arrivalMs = (1 / speed) * 16.67;
+        setTimeout(() => fireFrom(targetId, depth + 1), arrivalMs);
+      });
+    };
+
+    data.nodes.forEach((node: any) => {
+      if (isEmitter(node)) fireFrom(node.id, 0);
+    });
+  }, []);
 
   // Fonction pour mettre à jour l'espacement des nœuds
   const updateNodeSpacing = useCallback(() => {
@@ -1568,7 +1609,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
             return 0.8;
           })
           .linkDirectionalParticles((link: any) => {
-            if (!showParticles || !emitParticles) return 0;
+            if (!showParticles || !simulationRunning) return 0;
             if (link.maxParticleFlow) {
               return Math.min(8, Math.max(1, Math.floor(link.maxParticleFlow / 10)));
             }
@@ -1831,8 +1872,8 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
                     Texte permanent liens
                   </Button>
                   <Button
-                    variant={emitParticles ? "contained" : "outlined"}
-                    onClick={() => setEmitParticles(!emitParticles)}
+                    variant="outlined"
+                    onClick={handleEmitTrace}
                     startIcon={<FlashOnIcon />}
                     size="small"
                     sx={{ justifyContent: 'flex-start' }}
@@ -1841,10 +1882,13 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
                   </Button>
                   <Button
                     variant={simulationRunning ? "contained" : "outlined"}
-                    onClick={() => setSimulationRunning(!simulationRunning)}
+                    onClick={() => {
+                      if (onToggleSimulation) onToggleSimulation();
+                      else setSimulationRunning(!simulationRunning);
+                    }}
                     startIcon={simulationRunning ? <PauseIcon /> : <PlayArrowIcon />}
                     size="small"
-                    sx={{ 
+                    sx={{
                       justifyContent: 'flex-start',
                       color: simulationRunning ? 'success.main' : 'primary.main'
                     }}
