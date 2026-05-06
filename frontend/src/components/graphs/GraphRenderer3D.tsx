@@ -562,222 +562,26 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     setSimulationRunning(isSimulationRunning);
   }, [isSimulationRunning]);
   
-  // États pour les accordéons (legacy — conservés pour compat avec d'éventuels
-  // tests, mais le nouveau layout utilise le drawer ci-dessous).
-  const [controlsExpanded, setControlsExpanded] = useState(false);
-  const [parametersExpanded, setParametersExpanded] = useState(false);
-
   // Drawer des paramètres avancés (sliders) — fermé par défaut.
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
-  
-  // États pour le redimensionnement du panneau
-  const [panelSize, setPanelSize] = useState({ width: 320, height: 650 });
-  const [isResizing, setIsResizing] = useState(false);
-  
-  // Génération d'un ID unique basé sur le contenu DOT pour la mémorisation
-  const graphId = React.useMemo(() => {
-    // Hash simple du contenu DOT pour créer un ID unique
-    let hash = 0;
-    const str = dotContent.trim();
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convertir en entier 32 bits
-    }
-    return `graph_${Math.abs(hash)}`;
-  }, [dotContent]);
 
-  // État pour savoir si c'est le premier chargement
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  
-  // Fonction pour charger la position et l'état sauvegardés
-  const loadSavedState = useCallback(() => {
-    const savedPosition = localStorage.getItem(`vortex_controls_position_${graphId}`);
-    const savedMinimized = localStorage.getItem(`vortex_controls_minimized_${graphId}`);
-    
-    return {
-      position: savedPosition ? JSON.parse(savedPosition) : { x: 10, y: 10 },
-      minimized: savedMinimized ? JSON.parse(savedMinimized) : false
-    };
-  }, [graphId]);
-
-  // État pour la position du panneau de contrôles déplaçable avec mémorisation
-  const [controlsPosition, setControlsPosition] = useState(() => loadSavedState().position);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [isControlsMinimized, setIsControlsMinimized] = useState(() => loadSavedState().minimized);
-  
-  // Références pour manipulation DOM directe (sans React)
-  const controlsPanelRef = useRef<HTMLDivElement>(null);
-  const positionRef = useRef(controlsPosition);
-  const isDraggingRef = useRef(false);
-
-  // Synchroniser la référence et le DOM avec l'état
-  useEffect(() => {
-    positionRef.current = controlsPosition;
-    // Mettre à jour le DOM directement sans re-render
-    if (controlsPanelRef.current && !isDraggingRef.current) {
-      controlsPanelRef.current.style.transform = `translate(${controlsPosition.x}px, ${controlsPosition.y}px)`;
-    }
-  }, [controlsPosition]);
-  
-  // Sauvegarder la position quand elle change (avec debounce pour éviter trop d'écritures)
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      localStorage.setItem(`vortex_controls_position_${graphId}`, JSON.stringify(controlsPosition));
-    }, 100); // Debounce de 100ms
-    
-    return () => clearTimeout(timeoutId);
-  }, [controlsPosition, graphId]);
-
-  // Sauvegarder l'état minimisé quand il change
-  useEffect(() => {
-    localStorage.setItem(`vortex_controls_minimized_${graphId}`, JSON.stringify(isControlsMinimized));
-  }, [isControlsMinimized, graphId]);
-  
-  // Effet pour restaurer la position sauvegardée quand le graphId change
-  useEffect(() => {
-    const savedState = loadSavedState();
-    setControlsPosition(savedState.position);
-    setIsControlsMinimized(savedState.minimized);
-    setIsInitialLoad(true);
-  }, [graphId, loadSavedState]);
-  
   // Type pour la position
   interface Position {
     x: number;
     y: number;
   }
-  
+
   // État pour stocker les données du graphique
   const [currentGraphData, setCurrentGraphData] = useState<{nodes: ForceGraphNode[], links: ForceGraphLink[]}>({nodes: [], links: []});
-  
-  // Fonction pour contraindre la position du panneau dans les limites
-  const constrainPosition = useCallback((x: number, y: number, allowPartiallyHidden = false): Position => {
-    const containerWidth = dimensions.width;
-    const containerHeight = dimensions.height;
-    const currentWidth = panelSize.width;
-    const currentHeight = isControlsMinimized ? 60 : panelSize.height;
-    
-    if (allowPartiallyHidden && 
-        x >= -currentWidth * 0.8 && y >= -currentHeight * 0.8 &&
-        x <= containerWidth - currentWidth && y <= containerHeight - currentHeight) {
-      return { x, y };
-    }
-    
-    let constrainedX = Math.max(0, Math.min(x, containerWidth - currentWidth));
-    let constrainedY = Math.max(0, Math.min(y, containerHeight - currentHeight));
-    
-    return { x: constrainedX, y: constrainedY };
-  }, [dimensions.width, dimensions.height, panelSize.width, panelSize.height, isControlsMinimized]);
-  
-  // Gestion du drag & drop avec manipulation DOM directe (pas de React setState pendant le drag)
+
+  // First-render guard: a few downstream effects (showNodeText / showLinkText
+  // reconfigure) run only after init completes. Flip the flag once dimensions
+  // are known so they fire correctly.
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDraggingRef.current && controlsPanelRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Calcul direct des nouvelles coordonnées
-        const containerWidth = dimensions.width || 800;
-        const containerHeight = dimensions.height || 600;
-        
-        const newX = e.clientX - dragOffset.x;
-        const newY = e.clientY - dragOffset.y;
-        
-        // Application des contraintes
-        const currentWidth = panelSize.width;
-        const currentHeight = isControlsMinimized ? 60 : panelSize.height;
-        const constrainedX = Math.max(0, Math.min(newX, containerWidth - currentWidth));
-        const constrainedY = Math.max(0, Math.min(newY, containerHeight - currentHeight));
-        
-        // Mise à jour DOM directe - ULTRA FLUIDE car pas de React
-        controlsPanelRef.current.style.transform = `translate(${constrainedX}px, ${constrainedY}px)`;
-        
-        // Mettre à jour la référence pour la sauvegarde finale
-        positionRef.current = { x: constrainedX, y: constrainedY };
-      }
-    };
-    
-    const handleMouseUp = (e: MouseEvent) => {
-      if (isDraggingRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
-        isDraggingRef.current = false;
-        setIsDragging(false);
-        // Sauvegarder la position finale dans React state
-        setControlsPosition(positionRef.current);
-      }
-    };
-    
-    if (isDragging) {
-      isDraggingRef.current = true;
-      document.addEventListener('mousemove', handleMouseMove, { passive: false });
-      document.addEventListener('mouseup', handleMouseUp, { passive: false });
-    }
-    
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      isDraggingRef.current = false;
-    };
-  }, [isDragging, dragOffset, dimensions.width, dimensions.height, panelSize.width, panelSize.height, isControlsMinimized]);
-  
-  // Effet pour synchroniser la position DOM initiale avec React state
-  useEffect(() => {
-    if (controlsPanelRef.current && !isDragging) {
-      controlsPanelRef.current.style.transform = `translate(${controlsPosition.x}px, ${controlsPosition.y}px)`;
-      positionRef.current = controlsPosition;
-    }
-  }, [controlsPosition, isDragging]);
-  
-  // Gestion du redimensionnement
-  useEffect(() => {
-    if (!isResizing) return;
+    if (isInitialLoad) setIsInitialLoad(false);
+  }, [dimensions.width, dimensions.height, isInitialLoad]);
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = graphRef.current?.getBoundingClientRect();
-      if (!rect) return;
-
-      const newWidth = Math.max(280, Math.min(600, e.clientX - controlsPosition.x - rect.left));
-      const newHeight = Math.max(300, Math.min(800, e.clientY - controlsPosition.y - rect.top));
-      
-      setPanelSize({ width: newWidth, height: newHeight });
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing, controlsPosition]);
-  
-  // Effet pour ajuster la position quand les dimensions changent (sauf au chargement initial et pendant le drag)
-  useEffect(() => {
-    // Ne pas appliquer les contraintes au chargement initial pour préserver la position sauvegardée
-    if (isInitialLoad) {
-      setIsInitialLoad(false);
-      return;
-    }
-    
-    // Ne pas ajuster pendant le drag pour éviter les conflits
-    if (isDragging) {
-      return;
-    }
-    
-    // Seulement ajuster si la position actuelle sort des limites
-    const constrainedPos = constrainPosition(controlsPosition.x, controlsPosition.y, true);
-    if (constrainedPos.x !== controlsPosition.x || constrainedPos.y !== controlsPosition.y) {
-      setControlsPosition(constrainedPos);
-    }
-  }, [dimensions.width, dimensions.height, constrainPosition, controlsPosition, isInitialLoad, isDragging]);
-  
   // Effet pour détecter les dimensions du conteneur
   useLayoutEffect(() => {
     const updateDimensions = () => {

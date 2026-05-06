@@ -77,7 +77,7 @@ const countDotElements = (dot: string | undefined): { nodes: number; edges: numb
   const nodeIds = new Set<string>();
   const edgeRe = /([a-zA-Z_][\w]*|"[^"]*")\s*(?:->|--)\s*([a-zA-Z_][\w]*|"[^"]*")/g;
   let m: RegExpExecArray | null;
-  // eslint-disable-next-line no-cond-assign
+   
   while ((m = edgeRe.exec(stripped)) !== null) {
     nodeIds.add(m[1]);
     nodeIds.add(m[2]);
@@ -85,7 +85,7 @@ const countDotElements = (dot: string | undefined): { nodes: number; edges: numb
   // Plus standalone node declarations: `name [attrs]` or `name;` at statement
   // boundaries. Match anything not preceded by an edge operator.
   const declRe = /(^|[\n;{])\s*([a-zA-Z_][\w]*)\s*(?:\[|;)/g;
-  // eslint-disable-next-line no-cond-assign
+   
   while ((m = declRe.exec(stripped)) !== null) {
     const id = m[2];
     // Skip DOT keywords and the graph header.
@@ -277,7 +277,7 @@ const GraphViewer: React.FC = () => {
       || (currentGraph as any)?.dot_code
       || (currentGraph as any)?.dot_content
       || '';
-    // eslint-disable-next-line react-hooks/rules-of-hooks
+     
     const { nodes: nodeCount, edges: edgeCount } = useMemo(() => countDotElements(dot), [dot]);
 
     return (
