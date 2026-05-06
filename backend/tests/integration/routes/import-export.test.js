@@ -387,7 +387,8 @@ describe('GET /api/import-export/export/:id', () => {
 // POST /api/import-export/export-multiple
 // ----------------------------------------------------------------------------
 describe('POST /api/import-export/export-multiple', () => {
-  const VALID_UUID = '11111111-1111-1111-1111-111111111111';
+  // Real v4 UUID — express-validator's isUUID() rejects the all-1s pattern.
+  const VALID_UUID = 'aaaaaaaa-aaaa-4aaa-9aaa-aaaaaaaaaaaa';
 
   test('400 when graphIds is empty', async () => {
     const res = await request(buildApp())

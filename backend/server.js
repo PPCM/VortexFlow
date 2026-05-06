@@ -17,12 +17,10 @@ const authRoutes = require('./src/routes/auth');
 const publicRoutes = require('./src/routes/public');
 const graphRoutes = require('./src/routes/graphs');
 const userRoutes = require('./src/routes/users');
-const simulationRoutes = require('./src/routes/simulation');
 const dashboardRoutes = require('./src/routes/dashboard');
 const adminRoutes = require('./src/routes/admin');
 const systemRoutes = require('./src/routes/system');
 const importExportRoutes = require('./src/routes/import-export');
-const SimulationHandler = require('./src/websocket/simulationHandler');
 const { setupAdminUser } = require('./src/utils/setup');
 const { errorHandler, notFoundHandler } = require('./src/middleware/errorHandler');
 const { validateSession } = require('./src/middleware/auth');
@@ -61,10 +59,6 @@ const io = socketIo(server, {
 });
 
 logger.info('WebSocket server initialized');
-
-// Initialize simulation handler
-const simulationHandler = new SimulationHandler(io);
-logger.info('Simulation WebSocket handler initialized');
 
 // Security middleware
 app.use(helmet({
@@ -149,7 +143,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/graphs', validateSession, graphRoutes);
 app.use('/api/users', validateSession, userRoutes);
-app.use('/api/simulation', validateSession, simulationRoutes);
 app.use('/api/dashboard', validateSession, dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 // Health check endpoint (public) - must be before protected routes
@@ -198,18 +191,10 @@ async function startServer() {
   }
 }
 
-// Store simulation handler reference for cleanup
-app.simulationHandler = simulationHandler;
-
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  
-  // Cleanup simulation handler
-  if (simulationHandler) {
-    await simulationHandler.cleanup();
-  }
-  
+
   server.close(() => {
     logger.info('HTTP server closed');
     
@@ -227,12 +212,7 @@ process.on('SIGTERM', async () => {
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
-  
-  // Cleanup simulation handler
-  if (simulationHandler) {
-    await simulationHandler.cleanup();
-  }
-  
+
   server.close(() => {
     logger.info('HTTP server closed');
     
