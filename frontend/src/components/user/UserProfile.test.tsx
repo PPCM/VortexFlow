@@ -71,4 +71,28 @@ describe('UserProfile', () => {
     });
     expect(() => render(<UserProfile />)).not.toThrow();
   });
+
+  test('populates firstName/lastName when the camelCase user arrives after mount', async () => {
+    // Mount with no user, then re-render with the camelCase payload the
+    // backend actually sends. Regression for a bug where the effect read
+    // `first_name`/`last_name` (snake_case) and overwrote the form with
+    // empty strings when the camelCase user arrived.
+    mockUseAuth.mockReturnValue({
+      state: { user: null, isAuthenticated: false },
+      refreshUser: vi.fn(),
+    });
+    const { rerender, container } = render(<UserProfile />);
+
+    mockUseAuth.mockReturnValue({
+      state: {
+        user: { id: 9, email: 'bob@x.io', firstName: 'Bob', lastName: 'Builder' },
+        isAuthenticated: true,
+      },
+      refreshUser: vi.fn(),
+    });
+    rerender(<UserProfile />);
+
+    expect(container.innerHTML).toMatch(/Bob/);
+    expect(container.innerHTML).toMatch(/Builder/);
+  });
 });

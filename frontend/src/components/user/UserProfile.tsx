@@ -130,16 +130,20 @@ const UserProfile: React.FC = () => {
   // =====================================
   // Effets
   // =====================================
+  // Re-hydrate the form when authState.user arrives after mount. Backend
+  // sends camelCase fields (firstName/lastName), and there's no `username`
+  // field — fall back through fullName/firstName/email so the display name
+  // stays meaningful. Mirror the chain used at initial useState.
   useEffect(() => {
-    if (authState.user) {
-      setUserData({
-        username: authState.user.username,
-        email: authState.user.email,
-        firstName: authState.user.first_name || '',
-        lastName: authState.user.last_name || '',
-        bio: authState.user.bio || '',
-      });
-    }
+    const u = authState.user as any;
+    if (!u) return;
+    setUserData({
+      username: u.username || u.fullName || u.firstName || u.email || '',
+      email: u.email || '',
+      firstName: u.firstName || u.first_name || '',
+      lastName: u.lastName || u.last_name || '',
+      bio: u.bio || '',
+    });
   }, [authState.user]);
 
   useEffect(() => {
