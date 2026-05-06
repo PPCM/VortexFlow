@@ -1,7 +1,7 @@
 // VortexFlow Frontend - Visualiseur 3D
 // Interface de visualisation interactive avec Three.js
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -56,6 +56,45 @@ import { usePermissions } from '../../context/AuthContext';
 import { SimulationConfig } from '../../types';
 import LoadingPage from '../common/LoadingPage';
 import GraphRenderer3D from './GraphRenderer3D';
+
+/**
+ * Quick DOT counter — extracts node and edge counts directly from a DOT
+ * source string without going through the backend parser. Strips comments
+ * and string literals so they don't poison the regexes.
+ */
+const countDotElements = (dot: string | undefined): { nodes: number; edges: number } => {
+  if (!dot) return { nodes: 0, edges: 0 };
+  const stripped = dot
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '')
+    .replace(/#[^\n]*/g, '')
+    .replace(/"([^"\\]|\\.)*"/g, '""');
+
+  const edges = (stripped.match(/->|--/g) || []).length;
+
+  // Collect identifiers used as edge endpoints (the most reliable signal that
+  // a token is a node — bare attribute keys would be filtered out otherwise).
+  const nodeIds = new Set<string>();
+  const edgeRe = /([a-zA-Z_][\w]*|"[^"]*")\s*(?:->|--)\s*([a-zA-Z_][\w]*|"[^"]*")/g;
+  let m: RegExpExecArray | null;
+  // eslint-disable-next-line no-cond-assign
+  while ((m = edgeRe.exec(stripped)) !== null) {
+    nodeIds.add(m[1]);
+    nodeIds.add(m[2]);
+  }
+  // Plus standalone node declarations: `name [attrs]` or `name;` at statement
+  // boundaries. Match anything not preceded by an edge operator.
+  const declRe = /(^|[\n;{])\s*([a-zA-Z_][\w]*)\s*(?:\[|;)/g;
+  // eslint-disable-next-line no-cond-assign
+  while ((m = declRe.exec(stripped)) !== null) {
+    const id = m[2];
+    // Skip DOT keywords and the graph header.
+    if (!/^(graph|digraph|subgraph|node|edge|strict)$/i.test(id)) {
+      nodeIds.add(id);
+    }
+  }
+  return { nodes: nodeIds.size, edges };
+};
 
 const GraphViewer: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -231,9 +270,16 @@ const GraphViewer: React.FC = () => {
   // Composants internes
   // =====================================
   const GraphStats: React.FC = () => {
-    const nodeCount = currentGraph?.data?.nodes?.length || 0;
-    const edgeCount = currentGraph?.data?.edges?.length || 0;
-    
+    // The backend only ships the DOT source (`dotCode`), not pre-parsed graph
+    // data. Counts must be derived from the DOT string itself. Memoize so the
+    // regex sweep doesn't re-run on every render.
+    const dot = (currentGraph as any)?.dotCode
+      || (currentGraph as any)?.dot_code
+      || (currentGraph as any)?.dot_content
+      || '';
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { nodes: nodeCount, edges: edgeCount } = useMemo(() => countDotElements(dot), [dot]);
+
     return (
       <Card sx={{ mb: 2 }}>
         <CardContent sx={{ pb: '16px !important' }}>
@@ -346,7 +392,7 @@ const GraphViewer: React.FC = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 600 }}>
-            {currentGraph.name}
+            {(currentGraph as any).title || currentGraph.name || 'Sans titre'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {currentGraph.description}
