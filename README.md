@@ -7,11 +7,32 @@ VortexFlow permet de créer, visualiser et simuler des graphiques 3D interactifs
 ## 🌟 Fonctionnalités Principales
 
 - **Visualisation 3D interactive** avec Three.js
-- **Simulation de flux de données** en temps réel avec particules animées  
+- **Simulation de flux de données** entièrement côté navigateur — pas de
+  charge serveur pendant qu'elle tourne
 - **Éditeur DOT avancé** avec syntaxe étendue pour les simulations
 - **Système d'authentification multi-rôles** (viewer/editor/admin)
 - **Gestion collaborative** avec partage de graphiques
 - **Interface moderne et responsive**
+
+### Comportements 3D / simulation
+
+- **Auto-zoom à l'ouverture**: à l'ouverture d'un graphe, la caméra s'anime
+  (~1 s) jusqu'à un cadrage 2× plus serré qu'un `zoomToFit` standard.
+- **Particules conditionnelles**: les particules ne circulent sur les liens
+  *que* pendant qu'une simulation est active. Le graphe au repos reste
+  statique.
+- **Statistiques temps réel**: dès le démarrage, le panneau « Contrôles
+  Visuels » affiche le nombre de particules en vol, la latence moyenne et
+  les goulots d'étranglement (in-degree > 1). Les graphes sans attributs
+  VortexFlow obtiennent quand même des stats utiles via un fallback.
+- **Toolbar et panneau synchronisés**: le bouton ▶ « Démarrer simulation »
+  en haut et le bouton « Start/Pause Simulation » du panneau pilotent la
+  même fonction.
+- **« Émission particules » en mode trace**: bouton one-shot — chaque clic
+  envoie *une* particule depuis chaque nœud émetteur (avec
+  `particleGeneration > 0` si défini, sinon tous les nœuds), qui cascade
+  ensuite le long des liens sortants. Permet de visualiser un chemin sans
+  accumulation.
 
 ## 🚀 Stack Technique
 
@@ -102,10 +123,17 @@ digraph NetworkFlow {
 ```
 
 ### 3. Simulation Interactive
-- Utilisez les contrôles play/pause/reset
-- Ajustez la vitesse de simulation
-- Observez les flux de données en temps réel
-- Analysez les métriques de performance
+- **▶ Démarrer simulation** (toolbar) ou **Start Simulation** (panneau
+  Contrôles Visuels): lance la simulation continue côté frontend. Les
+  particules circulent sur tous les liens et les statistiques temps réel
+  démarrent.
+- **Émission particules**: bouton one-shot pour tracer un chemin —
+  envoie une particule par nœud émetteur, qui cascade ensuite sur les
+  successeurs. Utile pour suivre un flux sans accumulation.
+- **Particules sur liens**: toggle pour cacher / réafficher les
+  particules pendant une simulation active.
+- Pas d'appel serveur: tout tourne dans le navigateur via
+  `3d-force-graph` + Three.js.
 
 ## 🏗️ Architecture
 
@@ -218,6 +246,9 @@ backend/
 - Simulation temps réel : `start_simulation`, `pause_simulation`, etc.
 - Diffusion d'événements : `simulation_update`, `simulation_error`
 - Gestion des connexions et cleanup automatique
+- ⚠️ **Note**: Le handler de simulation côté serveur reste en place mais
+  n'est plus appelé par le frontend — la simulation tourne désormais
+  100 % côté navigateur (cf. section *Comportements 3D / simulation*).
 
 ### 🚀 **Démarrage Backend**
 
