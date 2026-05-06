@@ -226,9 +226,8 @@ describe('GraphRenderer3D — Émission particules (one-shot trace)', () => {
     render(<GraphRenderer3D dotContent={DOT} isValid />);
     await advancePastInit();
 
-    // Open the controls accordion that hides the trace + start buttons.
-    fireEvent.click(screen.getByText('Contrôles Visuels'));
-    const btn = await screen.findByRole('button', { name: /Émission particules/i });
+    // The trace button lives in the left rail as an aria-labelled IconButton.
+    const btn = screen.getByLabelText(/Émission particules/i);
 
     // Sample DOT has only `A` with particleGeneration → A is the lone
     // emitter. A's outgoing edges are A→B and A→C, so the immediate burst
@@ -245,7 +244,7 @@ describe('GraphRenderer3D — Émission particules (one-shot trace)', () => {
 // Toolbar / panel sync
 // ----------------------------------------------------------------------------
 describe('GraphRenderer3D — Start Simulation button delegates to onToggleSimulation', () => {
-  test('clicking Start Simulation in the panel calls the parent toggle', async () => {
+  test('clicking Start Simulation in the rail calls the parent toggle', async () => {
     const onToggle = vi.fn();
     render(
       <GraphRenderer3D
@@ -257,8 +256,7 @@ describe('GraphRenderer3D — Start Simulation button delegates to onToggleSimul
     );
     await advancePastInit();
 
-    fireEvent.click(screen.getByText('Contrôles Visuels'));
-    const btn = await screen.findByRole('button', { name: /Start Simulation/i });
+    const btn = screen.getByLabelText(/Start Simulation/i);
     fireEvent.click(btn);
 
     expect(onToggle).toHaveBeenCalledTimes(1);
@@ -268,11 +266,10 @@ describe('GraphRenderer3D — Start Simulation button delegates to onToggleSimul
     render(<GraphRenderer3D dotContent={DOT} isValid isSimulationRunning={false} />);
     await advancePastInit();
 
-    fireEvent.click(screen.getByText('Contrôles Visuels'));
-    const btn = await screen.findByRole('button', { name: /Start Simulation/i });
+    const btn = screen.getByLabelText(/Start Simulation/i);
     fireEvent.click(btn);
     // Local fallback flips the flag → label should switch to "Pause Simulation".
-    await screen.findByRole('button', { name: /Pause Simulation/i });
+    await screen.findByLabelText(/Pause Simulation/i);
   });
 });
 

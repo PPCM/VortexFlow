@@ -2,20 +2,16 @@
 // Composant de visualisation 3D avancé avec flèches, particules et texte
 
 import React, { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react';
-import { 
-  Box, 
-  Button, 
-  Card, 
-  CardContent, 
-  Paper, 
-  Typography, 
-  Tooltip, 
-  CircularProgress, 
+import {
+  Box,
+  Typography,
+  Tooltip,
+  CircularProgress,
   Alert,
   Slider,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails
+  IconButton,
+  Drawer,
+  Divider,
 } from '@mui/material';
 import { 
   Settings as SettingsIcon, 
@@ -566,9 +562,13 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     setSimulationRunning(isSimulationRunning);
   }, [isSimulationRunning]);
   
-  // États pour les accordéons
-  const [controlsExpanded, setControlsExpanded] = useState(false); // Accordéon "Contrôles Visuels" fermé par défaut
-  const [parametersExpanded, setParametersExpanded] = useState(false); // Accordéon "Paramètres Ajustables" fermé par défaut
+  // États pour les accordéons (legacy — conservés pour compat avec d'éventuels
+  // tests, mais le nouveau layout utilise le drawer ci-dessous).
+  const [controlsExpanded, setControlsExpanded] = useState(false);
+  const [parametersExpanded, setParametersExpanded] = useState(false);
+
+  // Drawer des paramètres avancés (sliders) — fermé par défaut.
+  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
   
   // États pour le redimensionnement du panneau
   const [panelSize, setPanelSize] = useState({ width: 320, height: 650 });
@@ -1546,416 +1546,246 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
   return (
     <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-      {/* Panneau de contrôles déplaçable avec manipulation DOM directe */}
-      <Paper 
-        elevation={3} 
-        ref={controlsPanelRef}
-        onMouseDown={(e) => {
-          setIsDragging(true);
-          setDragOffset({
-            x: e.clientX - positionRef.current.x,
-            y: e.clientY - positionRef.current.y
-          });
-        }}
-        sx={{ 
+      {/* Rail latéral immersif: icônes pour les toggles principaux,
+          divider, bouton Start/Pause, divider, accès au drawer paramètres. */}
+      <Box
+        sx={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          // Position initiale uniquement, sera écrasée par manipulation DOM pendant drag
-          transform: !isDragging ? `translate(${controlsPosition.x}px, ${controlsPosition.y}px)` : undefined,
-          width: `${panelSize.width}px`,
-          height: `${panelSize.height}px`,
-          minWidth: '280px',
-          minHeight: '300px',
-          maxWidth: '600px',
-          maxHeight: '800px',
-          zIndex: 10, 
-          backgroundColor: 'rgba(255, 255, 255, 0.9)',
-          cursor: isDragging ? 'grabbing' : (isResizing ? 'nw-resize' : 'grab'),
-          userSelect: 'none',
+          top: 16,
+          left: 16,
+          width: 56,
+          background: 'rgba(20, 25, 30, 0.85)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: 1.5,
+          boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4)',
+          py: 1,
           display: 'flex',
           flexDirection: 'column',
-          border: '1px solid rgba(0, 0, 0, 0.2)',
-          borderRadius: '8px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-          // Pas de transition pendant le drag pour performance maximale
-          transition: isDragging ? 'none' : 'background-color 0.2s ease',
-          '&:hover': {
-            backgroundColor: 'rgba(255, 255, 255, 0.95)'
-          }
+          alignItems: 'center',
+          gap: 0.5,
+          zIndex: 10,
         }}
       >
-        {/* En-tête du panneau - fixe */}
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          p: 2,
-          borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
-          backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          borderRadius: '8px 8px 0 0',
-          minHeight: '60px'
-        }}>
-          <Box sx={{ cursor: 'inherit', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <SettingsIcon sx={{ color: 'primary.main', fontSize: '1.2rem' }} />
-            <Typography variant="h6" sx={{ 
-              cursor: 'inherit', 
-              mb: 0, 
-              whiteSpace: 'nowrap', 
-              fontWeight: 600,
-              color: 'text.secondary',
-              textShadow: 'none'
-            }}>
-              Contrôles 3D
-            </Typography>
-          </Box>
-          <Button
+        {[
+          { title: 'Flèches directionnelles', icon: <ArrowIcon />, on: showArrows, onClick: () => setShowArrows(!showArrows) },
+          { title: 'Particules sur liens', icon: <ParticlesIcon />, on: showParticles, onClick: () => setShowParticles(!showParticles) },
+          { title: 'Texte permanent nœuds', icon: <TextFieldsIcon />, on: showNodeText, onClick: () => setShowNodeText(!showNodeText) },
+          { title: 'Texte permanent liens', icon: <LabelIcon />, on: showLinkText, onClick: () => setShowLinkText(!showLinkText) },
+        ].map((b) => (
+          <Tooltip key={b.title} title={b.title} placement="right" arrow>
+            <IconButton
+              size="small"
+              onClick={b.onClick}
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 1,
+                color: b.on ? 'success.main' : 'rgba(255, 255, 255, 0.7)',
+                background: b.on ? 'rgba(76, 175, 80, 0.18)' : 'transparent',
+                boxShadow: b.on ? 'inset 0 0 0 1px rgba(76, 175, 80, 0.3)' : 'none',
+                '&:hover': { background: 'rgba(76, 175, 80, 0.15)', color: 'success.main' },
+              }}
+            >
+              {b.icon}
+            </IconButton>
+          </Tooltip>
+        ))}
+        <Tooltip title="Émission particules (one-shot)" placement="right" arrow>
+          <IconButton
             size="small"
-            variant="text"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsControlsMinimized(!isControlsMinimized);
-            }}
-            sx={{ 
-              minWidth: '32px', 
-              height: '32px',
-              p: 0,
-              cursor: 'pointer',
-              '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.1)'
-              }
+            aria-label="Émission particules"
+            onClick={handleEmitTrace}
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: 1,
+              color: 'rgba(255, 255, 255, 0.7)',
+              '&:hover': { background: 'rgba(255, 152, 0, 0.18)', color: 'warning.main' },
             }}
           >
-            {isControlsMinimized ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-          </Button>
-        </Box>
-        
-        {/* Zone de contenu avec scroll */}
-        {!isControlsMinimized && (
-          <Box sx={{ 
-            flex: 1,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            p: 2,
-            '&::-webkit-scrollbar': {
-              width: '6px'
-            },
-            '&::-webkit-scrollbar-track': {
-              backgroundColor: 'rgba(0, 0, 0, 0.1)',
-              borderRadius: '3px'
-            },
-            '&::-webkit-scrollbar-thumb': {
-              backgroundColor: 'rgba(0, 0, 0, 0.3)',
-              borderRadius: '3px',
-              '&:hover': {
-                backgroundColor: 'rgba(0, 0, 0, 0.5)'
-              }
-            }
-          }}>
-            {/* Accordéon Contrôles Visuels */}
-            <Accordion 
-              expanded={controlsExpanded}
-              onChange={(_, isExpanded) => setControlsExpanded(isExpanded)}
-              sx={{ mb: 1, backgroundColor: 'rgba(240, 240, 240, 0.3)' }}
-            >
-              <AccordionSummary 
-                expandIcon={<ExpandMoreIcon sx={{ color: 'text.secondary' }} />}
-                sx={{
-                  '& .MuiAccordionSummary-expandIconWrapper': {
-                    color: 'text.secondary'
-                  }
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <SettingsIcon sx={{ fontSize: '1.1rem', color: 'primary.main' }} />
-                  <Typography variant="subtitle2" fontWeight={600} color="text.secondary">
-                    Contrôles Visuels
-                  </Typography>
-                </Box>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <Button
-                    variant={showArrows ? "contained" : "outlined"}
-                    onClick={() => setShowArrows(!showArrows)}
-                    startIcon={<ArrowForwardIcon />}
-                    size="small"
-                    sx={{ justifyContent: 'flex-start' }}
-                  >
-                    Flèches directionnelles
-                  </Button>
-                  <Button
-                    variant={showParticles ? "contained" : "outlined"}
-                    onClick={() => setShowParticles(!showParticles)}
-                    startIcon={<BlurOnIcon />}
-                    size="small"
-                    sx={{ justifyContent: 'flex-start' }}
-                  >
-                    Particules sur liens
-                  </Button>
-                  <Button
-                    variant={showNodeText ? "contained" : "outlined"}
-                    onClick={() => setShowNodeText(!showNodeText)}
-                    startIcon={<TextFieldsIcon />}
-                    size="small"
-                    sx={{ justifyContent: 'flex-start' }}
-                  >
-                    Texte permanent nœuds
-                  </Button>
-                  <Button
-                    variant={showLinkText ? "contained" : "outlined"}
-                    onClick={() => setShowLinkText(!showLinkText)}
-                    startIcon={<LinkIcon />}
-                    size="small"
-                    sx={{ justifyContent: 'flex-start' }}
-                  >
-                    Texte permanent liens
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    onClick={handleEmitTrace}
-                    startIcon={<FlashOnIcon />}
-                    size="small"
-                    sx={{ justifyContent: 'flex-start' }}
-                  >
-                    Émission particules
-                  </Button>
-                  <Button
-                    variant={simulationRunning ? "contained" : "outlined"}
-                    onClick={() => {
-                      if (onToggleSimulation) onToggleSimulation();
-                      else setSimulationRunning(!simulationRunning);
-                    }}
-                    startIcon={simulationRunning ? <PauseIcon /> : <PlayArrowIcon />}
-                    size="small"
-                    sx={{
-                      justifyContent: 'flex-start',
-                      color: simulationRunning ? 'success.main' : 'primary.main'
-                    }}
-                  >
-                    {simulationRunning ? 'Pause' : 'Start'} Simulation
-                  </Button>
-                  
-                  {/* Statistiques temps réel */}
-                  {simulationRunning && (
-                    <Box sx={{ 
-                      mt: 1, 
-                      p: 1, 
-                      bgcolor: 'background.paper', 
-                      borderRadius: 1, 
-                      border: '1px solid',
-                      borderColor: 'divider'
-                    }}>
-                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                        Statistiques Temps Réel
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}>
-                        <Typography variant="caption" color="success.main">
-                          Particules totales: {simulationStats.totalParticles}
-                        </Typography>
-                        <Typography variant="caption" color="warning.main">
-                          Latence moyenne: {simulationStats.averageLatency}ms
-                        </Typography>
-                        <Typography variant="caption" color="error.main">
-                          Goulots d'étranglement: {simulationStats.bottleneckNodes}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  )}
-                </Box>
-              </AccordionDetails>
-            </Accordion>
-            
-            {/* Accordéon Paramètres Ajustables */}
-            <Accordion 
-              expanded={parametersExpanded}
-              onChange={(_, isExpanded) => setParametersExpanded(isExpanded)}
-              sx={{ backgroundColor: 'rgba(240, 240, 240, 0.3)' }}
-            >
-              <AccordionSummary 
-                expandIcon={<ExpandMoreIcon sx={{ color: 'text.secondary' }} />}
-                sx={{
-                  '& .MuiAccordionSummary-expandIconWrapper': {
-                    color: 'text.secondary'
-                  }
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <TuneIcon sx={{ fontSize: '1.1rem', color: 'primary.main' }} />
-                  <Typography variant="subtitle2" fontWeight={600} color="text.secondary">
-                    Paramètres Ajustables
-                  </Typography>
-                </Box>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {/* Slider intensité courbes */}
-                  <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 0.8 }}>
-                      <LinkIcon sx={{ fontSize: '1rem', color: 'info.main' }} />
-                      <Typography variant="caption" sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'text.secondary' }}>
-                        Courbe des liens: {Math.round(linkCurvature * 100)}%
-                      </Typography>
-                    </Box>
-                    <Slider
-                      value={linkCurvature}
-                      onChange={(_, value) => setLinkCurvature(value as number)}
-                      min={0}
-                      max={1}
-                      step={0.1}
-                      size="small"
-                      sx={{
-                        color: 'info.main',
-                        '& .MuiSlider-thumb': {
-                          width: 18,
-                          height: 18
-                        },
-                        '& .MuiSlider-track': {
-                          height: 4
-                        }
-                      }}
-                      onMouseDown={(e) => {
-                        if (e.target instanceof Element && 
-                            (e.target.closest('.MuiSlider-root') || e.target.classList.contains('MuiSlider-thumb'))) {
-                          e.stopPropagation();
-                        }
-                      }}
-                    />
-                  </Box>
-                  
-                  {/* Slider épaisseur liens */}
-                  <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 0.8 }}>
-                      <LinkIcon sx={{ fontSize: '1rem', color: 'success.main' }} />
-                      <Typography variant="caption" sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'text.secondary' }}>
-                        Épaisseur: {linkWidth === 0 ? 'filet' : `${linkWidth}px`}
-                      </Typography>
-                    </Box>
-                    <Slider
-                      value={linkWidth}
-                      onChange={(_, value) => setLinkWidth(value as number)}
-                      min={0}
-                      max={8}
-                      step={0.5}
-                      size="small"
-                      sx={{
-                        color: 'success.main',
-                        '& .MuiSlider-thumb': {
-                          width: 18,
-                          height: 18
-                        },
-                        '& .MuiSlider-track': {
-                          height: 4
-                        }
-                      }}
-                      onMouseDown={(e) => {
-                        if (e.target instanceof Element && 
-                            (e.target.closest('.MuiSlider-root') || e.target.classList.contains('MuiSlider-thumb'))) {
-                          e.stopPropagation();
-                        }
-                      }}
-                    />
-                  </Box>
-                  
-                  {/* Slider espacement nœuds */}
-                  <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 0.8 }}>
-                      <NodesIcon sx={{ fontSize: '1rem', color: 'warning.main' }} />
-                      <Typography variant="caption" sx={{ fontSize: '0.8rem', fontWeight: 500, color: 'text.secondary' }}>
-                        Espacement: {nodeSpacing}px
-                      </Typography>
-                    </Box>
-                    <Slider
-                      value={nodeSpacing}
-                      onChange={(_, value) => setNodeSpacing(value as number)}
-                      min={10}
-                      max={100}
-                      step={5}
-                      size="small"
-                      sx={{
-                        color: 'warning.main',
-                        '& .MuiSlider-thumb': {
-                          width: 18,
-                          height: 18
-                        },
-                        '& .MuiSlider-track': {
-                          height: 4
-                        }
-                      }}
-                      onMouseDown={(e) => {
-                        if (e.target instanceof Element && 
-                            (e.target.closest('.MuiSlider-root') || e.target.classList.contains('MuiSlider-thumb'))) {
-                          e.stopPropagation();
-                        }
-                      }}
-                    />
-                  </Box>
-                </Box>
-              </AccordionDetails>
-            </Accordion>
-            
-            {/* Statistiques */}
-            {renderStats.nodes > 0 && (
-          <Card sx={{ mt: 2, backgroundColor: 'rgba(255, 255, 255, 0.85)', border: '1px solid rgba(0, 0, 0, 0.2)', boxShadow: 2 }}>
-            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <StatsIcon sx={{ fontSize: '1.1rem', color: 'primary.main' }} />
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                  Statistiques
+            <FlashOnIcon />
+          </IconButton>
+        </Tooltip>
+
+        <Divider sx={{ width: '70%', borderColor: 'rgba(255, 255, 255, 0.08)', my: 0.5 }} />
+
+        <Tooltip title={simulationRunning ? 'Pause Simulation' : 'Démarrer Simulation'} placement="right" arrow>
+          <IconButton
+            size="small"
+            aria-label={simulationRunning ? 'Pause Simulation' : 'Start Simulation'}
+            onClick={() => {
+              if (onToggleSimulation) onToggleSimulation();
+              else setSimulationRunning(!simulationRunning);
+            }}
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: 1,
+              color: simulationRunning ? 'warning.main' : 'success.main',
+              background: simulationRunning ? 'rgba(255, 152, 0, 0.15)' : 'rgba(76, 175, 80, 0.15)',
+              '&:hover': { background: simulationRunning ? 'rgba(255, 152, 0, 0.25)' : 'rgba(76, 175, 80, 0.25)' },
+            }}
+          >
+            {simulationRunning ? <PauseIcon /> : <PlayArrowIcon />}
+          </IconButton>
+        </Tooltip>
+
+        <Divider sx={{ width: '70%', borderColor: 'rgba(255, 255, 255, 0.08)', my: 0.5 }} />
+
+        <Tooltip title="Paramètres avancés" placement="right" arrow>
+          <IconButton
+            size="small"
+            onClick={() => setSettingsDrawerOpen(true)}
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: 1,
+              color: 'rgba(255, 255, 255, 0.7)',
+              '&:hover': { background: 'rgba(76, 175, 80, 0.15)', color: 'success.main' },
+            }}
+          >
+            <TuneIcon />
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      {/* Stats discrètes en haut-droite — toujours visibles, agrandies pendant
+          la simulation pour faire ressortir les chiffres temps réel. */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          background: 'rgba(15, 20, 25, 0.6)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
+          borderRadius: 1.25,
+          px: 1.5,
+          py: 1,
+          display: 'flex',
+          gap: 2.5,
+          zIndex: 10,
+        }}
+      >
+        {[
+          { k: 'Nœuds', v: renderStats.nodes, color: 'success.main' },
+          { k: 'Liens', v: renderStats.links, color: 'info.main' },
+          { k: 'FPS', v: renderStats.fps || '—', color: 'warning.main' },
+        ].map((s) => (
+          <Box key={s.k} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 38 }}>
+            <Typography sx={{ fontSize: 10, letterSpacing: 0.4, textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
+              {s.k}
+            </Typography>
+            <Typography sx={{ fontFamily: 'ui-monospace, monospace', fontWeight: 600, fontSize: 16, color: s.color }}>
+              {s.v}
+            </Typography>
+          </Box>
+        ))}
+        {simulationRunning && (
+          <>
+            <Box sx={{ width: 1, background: 'rgba(255, 255, 255, 0.08)' }} />
+            {[
+              { k: 'Particules', v: simulationStats.totalParticles, color: 'success.main' },
+              { k: 'Latence', v: `${simulationStats.averageLatency} ms`, color: 'info.main' },
+              { k: 'Goulots', v: simulationStats.bottleneckNodes, color: 'error.main' },
+            ].map((s) => (
+              <Box key={s.k} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 38 }}>
+                <Typography sx={{ fontSize: 10, letterSpacing: 0.4, textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
+                  {s.k}
+                </Typography>
+                <Typography sx={{ fontFamily: 'ui-monospace, monospace', fontWeight: 600, fontSize: 16, color: s.color }}>
+                  {s.v}
                 </Typography>
               </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                  <NodesIcon sx={{ fontSize: '1rem', color: 'success.main' }} />
-                  <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.9rem' }}>
-                    Nœuds: <strong style={{ color: '#2e7d32' }}>{renderStats.nodes}</strong>
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                  <LinkIcon sx={{ fontSize: '1rem', color: 'info.main' }} />
-                  <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.9rem' }}>
-                    Liens: <strong style={{ color: '#0288d1' }}>{renderStats.links}</strong>
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                  <SpeedIcon sx={{ fontSize: '1rem', color: 'warning.main' }} />
-                  <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.9rem' }}>
-                    FPS: <strong style={{ color: '#f57c00' }}>{renderStats.fps || 'N/A'}</strong>
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-            )}
-          </Box>
+            ))}
+          </>
         )}
-        
-        {/* Poignée de redimensionnement */}
-        <Box
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            setIsResizing(true);
-          }}
-          sx={{
-            position: 'absolute',
-            bottom: 0,
-            right: 0,
-            width: '20px',
-            height: '20px',
-            cursor: 'nw-resize',
-            '&::after': {
-              content: '""',
-              position: 'absolute',
-              right: '3px',
-              bottom: '3px',
-              width: '5px',
-              height: '5px',
-              borderRight: '2px solid rgba(0, 0, 0, 0.3)',
-              borderBottom: '2px solid rgba(0, 0, 0, 0.3)'
-            }
-          }}
-        />
-      </Paper>
+      </Box>
+
+      {/* Drawer des paramètres avancés — déclenché par l'icône ⚙ du rail. */}
+      <Drawer
+        anchor="right"
+        open={settingsDrawerOpen}
+        onClose={() => setSettingsDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: 320,
+            background: 'rgba(20, 25, 30, 0.92)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            color: '#fff',
+            borderLeft: '1px solid rgba(76, 175, 80, 0.18)',
+            p: 3,
+          },
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+          <TuneIcon sx={{ color: 'success.main' }} />
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Paramètres</Typography>
+        </Box>
+
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <Box>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+              Courbe des liens : {Math.round(linkCurvature * 100)}%
+            </Typography>
+            <Slider
+              value={linkCurvature}
+              onChange={(_, value) => setLinkCurvature(value as number)}
+              min={0}
+              max={1}
+              step={0.1}
+              size="small"
+              sx={{ color: 'info.main' }}
+            />
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+              Épaisseur des liens : {linkWidth === 0 ? 'filet' : `${linkWidth}px`}
+            </Typography>
+            <Slider
+              value={linkWidth}
+              onChange={(_, value) => setLinkWidth(value as number)}
+              min={0}
+              max={8}
+              step={0.5}
+              size="small"
+              sx={{ color: 'success.main' }}
+            />
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+              Espacement des nœuds : {nodeSpacing}px
+            </Typography>
+            <Slider
+              value={nodeSpacing}
+              onChange={(_, value) => setNodeSpacing(value as number)}
+              min={10}
+              max={100}
+              step={5}
+              size="small"
+              sx={{ color: 'warning.main' }}
+            />
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+              Taille des nœuds : {nodeSize}
+            </Typography>
+            <Slider
+              value={nodeSize}
+              onChange={(_, value) => setNodeSize(value as number)}
+              min={2}
+              max={20}
+              step={1}
+              size="small"
+              sx={{ color: 'success.main' }}
+            />
+          </Box>
+        </Box>
+      </Drawer>
 
       {/* Zone de rendu 3D */}
       <Box
@@ -2029,22 +1859,29 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         </Alert>
       )}
 
-      {/* Aide contextuelle */}
-      <Tooltip 
+      {/* Aide contextuelle — pastille translucide cohérente avec le rail. */}
+      <Tooltip
         title="🖱️ Clic gauche: rotation • Molette: zoom • Clic droit: pan • Clic sur nœud: focus"
         placement="top"
       >
-        <Paper 
-          sx={{ 
-            position: 'absolute', 
-            bottom: 10, 
-            right: 10, 
-            p: 1,
-            backgroundColor: 'rgba(255, 255, 255, 0.9)'
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 12,
+            right: 12,
+            px: 1.25,
+            py: 0.5,
+            background: 'rgba(15, 20, 25, 0.6)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            borderRadius: 1,
+            color: 'rgba(255, 255, 255, 0.7)',
+            cursor: 'help',
           }}
         >
           <Typography variant="caption">💡 Aide</Typography>
-        </Paper>
+        </Box>
       </Tooltip>
     </Box>
   );
