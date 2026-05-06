@@ -2,7 +2,7 @@
 // Configuration du routing, des providers et de la gestion d'erreurs
 
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline, Box, Typography } from '@mui/material';
 
 // Providers globaux
@@ -159,6 +159,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" replace />;
   }
 
+  // Routes publiques (login/register): si l'utilisateur a déjà une session
+  // active, on évite de réafficher le formulaire de connexion en le
+  // renvoyant vers le dashboard.
+  if (!requireAuth && user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   if (requireAdmin && !canAdmin()) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -173,11 +180,18 @@ interface AppLayoutProps {
   children: React.ReactNode;
 }
 
+// Chemins sur lesquels on ne montre jamais le menu de gauche, même si une
+// session backend est encore valide (cas d'un utilisateur qui revient
+// manuellement sur /login pour changer de compte par ex.).
+const NO_NAV_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];
+
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { state } = useAuth();
   const { user } = state;
+  const { pathname } = useLocation();
+  const hideNav = NO_NAV_PATHS.some((p) => pathname.startsWith(p));
 
-  if (!user) {
+  if (!user || hideNav) {
     return (
       <Box sx={{ minHeight: '100vh' }}>
         {children}
