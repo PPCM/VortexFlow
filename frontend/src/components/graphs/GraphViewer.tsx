@@ -437,6 +437,7 @@ const GraphViewer: React.FC = () => {
                 || ''
               }
               isValid={true}
+              isSimulationRunning={simulationState?.config?.isRunning ?? false}
             />
           </Box>
         </Paper>

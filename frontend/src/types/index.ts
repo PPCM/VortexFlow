@@ -116,6 +116,8 @@ export interface SimulationConfig {
 }
 
 export interface SimulationState {
+  // Backend session ID — required to call /simulation/:id/{stop,pause,resume}.
+  sessionId?: string;
   config: SimulationConfig;
   particles: SimulationParticle[];
   statistics: {

@@ -348,7 +348,8 @@ export const GraphProvider: React.FC<GraphProviderProps> = ({ children }) => {
       
       if (response.success) {
         const simulationState: SimulationState = {
-          config,
+          sessionId: response.data?.id,
+          config: { ...config, isRunning: true },
           particles: [],
           statistics: {
             totalParticles: 0,
@@ -357,7 +358,7 @@ export const GraphProvider: React.FC<GraphProviderProps> = ({ children }) => {
             averageSpeed: 0,
           }
         };
-        
+
         dispatch({ type: 'SET_SIMULATION', payload: simulationState });
         
         // Démarrer via WebSocket
@@ -371,41 +372,30 @@ export const GraphProvider: React.FC<GraphProviderProps> = ({ children }) => {
   }, [state.currentGraph]);
 
   const stopSimulation = useCallback(async (): Promise<void> => {
-    if (!state.currentGraph) return;
+    if (!state.currentGraph || !state.simulation?.sessionId) return;
 
     try {
-      // TODO: This should use actual sessionId from active simulation session
-      await apiService.stopSimulation(state.currentGraph.id.toString());
-      
-      // Arrêter via WebSocket
+      await apiService.stopSimulation(state.simulation.sessionId);
+
       webSocketService.stopSimulation(state.currentGraph.id);
-      
-      // Mettre à jour le state local
-      if (state.simulation) {
-        dispatch({ 
-          type: 'UPDATE_SIMULATION_CONFIG', 
-          payload: { isRunning: false }
-        });
-      }
+
+      dispatch({ type: 'SET_SIMULATION', payload: null });
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: apiService.handleApiError(error) });
     }
   }, [state.currentGraph, state.simulation]);
 
   const pauseSimulation = useCallback(async (): Promise<void> => {
-    if (!state.currentGraph) return;
+    if (!state.currentGraph || !state.simulation?.sessionId) return;
 
     try {
-      // TODO: This should use actual sessionId from active simulation session
-      await apiService.pauseSimulation(state.currentGraph.id.toString());
-      
-      // Pause via WebSocket
+      await apiService.pauseSimulation(state.simulation.sessionId);
+
       webSocketService.pauseSimulation(state.currentGraph.id);
-      
-      // Mettre à jour le state local
+
       if (state.simulation) {
-        dispatch({ 
-          type: 'UPDATE_SIMULATION_CONFIG', 
+        dispatch({
+          type: 'UPDATE_SIMULATION_CONFIG',
           payload: { isPaused: true }
         });
       }

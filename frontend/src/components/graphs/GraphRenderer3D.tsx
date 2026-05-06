@@ -60,6 +60,9 @@ interface GraphRenderer3DProps {
   dotContent: string;
   isValid: boolean;
   parsedData?: GraphData;
+  // Drives the in-renderer simulation: when true, particles emit along links
+  // and the per-node accumulation / stats effect runs.
+  isSimulationRunning?: boolean;
 }
 
 // Types pour la gestion des données 3D étendues
@@ -517,7 +520,8 @@ export class DotTo3DConverter {
 const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   dotContent,
   isValid,
-  parsedData
+  parsedData,
+  isSimulationRunning,
 }) => {
   const graphRef = useRef<HTMLDivElement>(null);
   const forceGraphRef = useRef<any>(null);
@@ -550,6 +554,15 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     averageLatency: 0,
     bottleneckNodes: 0
   });
+
+  // Mirror the global simulation state (driven by the parent's "Démarrer
+  // simulation" button + WebSocket session) into the renderer's local flags
+  // so particles flow on the links and the accumulation effect runs.
+  useEffect(() => {
+    if (isSimulationRunning === undefined) return;
+    setSimulationRunning(isSimulationRunning);
+    setEmitParticles(isSimulationRunning);
+  }, [isSimulationRunning]);
   
   // États pour les accordéons
   const [controlsExpanded, setControlsExpanded] = useState(false); // Accordéon "Contrôles Visuels" fermé par défaut
@@ -844,14 +857,17 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       spriteText.color = node.color || '#4fc3f7'; // Couleur du nœud
       // Pas de backgroundColor pour éviter le cadre noir
       
-      // Configuration du matériau pour la gestion de la profondeur
+      // depthTest:false + high renderOrder keeps node text always on top of
+      // particles and other meshes (otherwise particles passing in front
+      // would visually cut the label).
       if (spriteText.material) {
-        spriteText.material.depthTest = true;
+        spriteText.material.depthTest = false;
         spriteText.material.depthWrite = false;
         spriteText.material.transparent = true;
         spriteText.material.alphaTest = 0.1;
       }
-      
+      spriteText.renderOrder = 10;
+
       return spriteText;
     }
     
@@ -908,12 +924,12 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           return undefined;
       }
       
-      // Matériau avec couleur et effets
+      // Opaque material — transparent meshes don't write to the depth buffer,
+      // which made faces flicker / vanish when rotating. DoubleSide also avoids
+      // backface culling artifacts on torus / cone interiors.
       material = new THREE.MeshLambertMaterial({
         color: node.color || '#4fc3f7',
-        transparent: true,
-        opacity: 0.8,
-        // Effet métallique léger pour les géométries personnalisées
+        side: THREE.DoubleSide,
         emissive: node.bloomEffect ? new THREE.Color(node.color || '#4fc3f7').multiplyScalar(0.1) : 0x000000
       });
       
@@ -934,14 +950,17 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         spriteText.color = node.color || '#4fc3f7'; // Couleur du nœud
         // Pas de backgroundColor pour éviter le cadre noir
         
-        // Configuration du matériau pour la gestion de la profondeur
+        // depthTest:false + high renderOrder keeps node text always on top of
+        // particles and other meshes (otherwise particles passing in front
+        // would visually cut the label).
         if (spriteText.material) {
-          spriteText.material.depthTest = true;
+          spriteText.material.depthTest = false;
           spriteText.material.depthWrite = false;
           spriteText.material.transparent = true;
           spriteText.material.alphaTest = 0.1;
         }
-        
+        spriteText.renderOrder = 10;
+
         // Positionner le texte au-dessus de la géométrie selon le type
         let textYOffset = 6; // Valeur par défaut augmentée pour plus d'espace
         switch (node.geometry) {
@@ -1159,18 +1178,14 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     if (!forceGraphRef.current) return;
     
     forceGraphRef.current
-      // Nombre de particules basé sur maxParticleFlow ou contrôle UI
+      // Particles only emit while a simulation is running. Outside of that,
+      // every link reports 0 so nothing flows on idle graphs.
       .linkDirectionalParticles((link: any) => {
-        if (!showParticles) return 0;
-        
-        // Utiliser maxParticleFlow du DOT si disponible
+        if (!showParticles || !emitParticles) return 0;
         if (link.maxParticleFlow && link.maxParticleFlow > 0) {
-          // Convertir maxParticleFlow en nombre de particules (1-10)
           return Math.max(1, Math.min(10, Math.floor(link.maxParticleFlow / 20)));
         }
-        
-        // Sinon utiliser contrôle UI (mode classique)
-        return emitParticles ? 4 : 1;
+        return 4;
       })
       // Vitesse basée sur particleSpeed ou contrôle UI
       .linkDirectionalParticleSpeed((link: any) => {
@@ -1191,54 +1206,85 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         }
         return 2; // Taille par défaut
       })
-      // Couleur des particules match celle du lien
-      .linkDirectionalParticleColor((link: any) => {
-        return link.color || '#ffa500'; // Orange par défaut pour visibilité
-      });
+      // Force a bright fixed color for particles. We deliberately ignore
+      // link.color here: dark link colors (and unlit Lambert fallbacks) made
+      // particles render almost black, masking labels behind them.
+      .linkDirectionalParticleColor(() => '#ffd54f');
   }, [showParticles, emitParticles]);
 
   // Simulation temps réel des accumulations
   useEffect(() => {
     if (!simulationRunning || !currentGraphData?.nodes) return;
     
+    // Track in-degree and link traversal time so that even DOT graphs without
+    // VortexFlow attributes get meaningful stats once the sim is running.
+    const inDegree = new Map<string, number>();
+    let traversalTimeSum = 0;
+    let traversalTimeCount = 0;
+    currentGraphData.links?.forEach((link: any) => {
+      const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+      inDegree.set(targetId, (inDegree.get(targetId) || 0) + 1);
+      const speed = link.particleSpeed && link.particleSpeed > 0 ? link.particleSpeed * 0.003 : 0.008;
+      traversalTimeSum += 1 / speed;
+      traversalTimeCount += 1;
+    });
+    const avgTraversalMs = traversalTimeCount > 0
+      ? Math.round((traversalTimeSum / traversalTimeCount) * 16.67)
+      : 0;
+    const bottleneckFromTopology = Array.from(inDegree.values()).filter((d) => d > 1).length;
+
     const interval = setInterval(() => {
       const newAccumulation = new Map<string, number>();
-      let totalParticles = 0;
+      let vortexParticles = 0;
       let bottleneckCount = 0;
-      
+
       currentGraphData.nodes.forEach((node: any) => {
         if (node.particleGeneration && node.maxParticleProcessing) {
-          // Calculer accumulation réelle
           const currentAccumulation = nodeAccumulation.get(node.id) || 0;
           const generation = node.particleGeneration;
           const processing = node.maxParticleProcessing;
-          
-          // Simulation : accumulation += génération - traitement
-          const deltaTime = 0.1; // 100ms de simulation
+          const deltaTime = 0.1;
           const newValue = Math.max(0, currentAccumulation + (generation - processing) * deltaTime);
-          
           newAccumulation.set(node.id, newValue);
-          totalParticles += newValue;
-          
-          // Détecter goulots
-          if (generation > processing) {
-            bottleneckCount++;
-          }
+          vortexParticles += newValue;
+          if (generation > processing) bottleneckCount++;
         }
       });
-      
+
+      // Count actual flowing particles in the Three.js scene as a fallback
+      // when nodes don't define particleGeneration / maxParticleProcessing.
+      let sceneParticles = 0;
+      const fg = forceGraphRef.current;
+      if (fg && typeof fg.scene === 'function') {
+        fg.scene().traverse((obj: any) => {
+          if (
+            obj.visible
+            && obj.geometry
+            && obj.geometry.type === 'SphereGeometry'
+            && obj.geometry.parameters.radius < 100
+          ) {
+            sceneParticles++;
+          }
+        });
+      }
+
+      const usingVortex = vortexParticles > 0;
+      const totalParticles = usingVortex ? Math.round(vortexParticles) : sceneParticles;
+      const averageLatency = usingVortex
+        ? Math.round((vortexParticles / currentGraphData.nodes.length) * 10) / 10
+        : avgTraversalMs;
+
       setNodeAccumulation(newAccumulation);
       setSimulationStats({
-        totalParticles: Math.round(totalParticles),
-        averageLatency: totalParticles > 0 ? Math.round(totalParticles / currentGraphData.nodes.length * 10) / 10 : 0,
-        bottleneckNodes: bottleneckCount
+        totalParticles,
+        averageLatency,
+        bottleneckNodes: usingVortex ? bottleneckCount : bottleneckFromTopology,
       });
-      
-      // Forcer re-rendu du graph avec nouvelles accumulations
+
       if (forceGraphRef.current) {
-        forceGraphRef.current.nodeVal(undefined); // Force refresh
+        forceGraphRef.current.nodeVal(undefined);
       }
-    }, 100); // Mise à jour toutes les 100ms
+    }, 100);
     
     return () => clearInterval(interval);
   }, [simulationRunning, currentGraphData, nodeAccumulation]);
@@ -1415,6 +1461,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
   // Effet pour initialiser/réinitialiser le graphique
   useEffect(() => {
+    let particlePatchInterval: ReturnType<typeof setInterval> | null = null;
     // Fonction d'initialisation du graphique 3D
     const initializeGraph = async () => {
       if (!graphRef.current || !isValid) return;
@@ -1436,6 +1483,8 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           setError('Aucun nœud trouvé dans le graphique');
           return;
         }
+
+        setCurrentGraphData({ nodes: graphData.nodes, links: graphData.links });
 
         // Création de l'instance 3D
         const graph = ForceGraph3D()(graphRef.current!)
@@ -1483,14 +1532,13 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
             sprite.padding = 1;
             sprite.borderRadius = 1;
             
-            // Configuration du matériau pour la gestion de la profondeur
+            // Always render link labels on top of particles / meshes.
             if (sprite.material) {
-              sprite.material.depthTest = true;
+              sprite.material.depthTest = false;
               sprite.material.depthWrite = false;
               sprite.material.transparent = true;
               sprite.material.alphaTest = 0.1;
-              // Ordre de rendu plus élevé pour que les liens apparaissent derrière les nœuds
-              sprite.renderOrder = -1;
+              sprite.renderOrder = 10;
             }
             
             return sprite;
@@ -1520,14 +1568,14 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
             return 0.8;
           })
           .linkDirectionalParticles((link: any) => {
-            if (!showParticles) return 0;
-            if (emitParticles && link.maxParticleFlow) {
+            if (!showParticles || !emitParticles) return 0;
+            if (link.maxParticleFlow) {
               return Math.min(8, Math.max(1, Math.floor(link.maxParticleFlow / 10)));
             }
-            return showParticles ? 2 : 0;
+            return 4;
           })
           .linkDirectionalParticleSpeed(0.01)
-          .linkDirectionalParticleColor(() => '#ffff00');
+          .linkDirectionalParticleColor(() => '#ffd54f');
 
         // Stats de rendu
         const updateStats = () => {
@@ -1541,12 +1589,48 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         graph.onEngineStop(updateStats);
         updateStats();
 
+        // 3d-force-graph creates link directional particles with a
+        // MeshLambertMaterial that has transparent=true and opacity=undefined,
+        // which renders as fully transparent. Walk the scene every 200ms and
+        // force them opaque so the particles are visible.
+        const sceneRoot = graph.scene();
+        particlePatchInterval = setInterval(() => {
+          sceneRoot.traverse((obj: any) => {
+            if (
+              obj.geometry
+              && obj.geometry.type === 'SphereGeometry'
+              && obj.geometry.parameters.radius < 100
+              && obj.material
+              && (obj.material.transparent || obj.material.opacity === undefined)
+            ) {
+              obj.material.transparent = false;
+              obj.material.opacity = 1;
+              obj.material.needsUpdate = true;
+            }
+          });
+        }, 200);
+
         // Appliquer les paramètres initiaux
         setTimeout(() => {
           updateNodeSpacing();
           updateLinkProperties();
           updateParticleProperties();
-        }, 100);
+          // Auto-zoom on open. We want a single smooth animation that ends
+          // ~2x closer than a default zoomToFit. Trick: snap-fit instantly to
+          // read the "fitted" camera distance, snap back, then animate from
+          // the original position to half-distance over ~1s. Negative padding
+          // is silently dropped by 3d-force-graph, so we compute the target
+          // ourselves.
+          if (forceGraphRef.current) {
+            const padding = Math.max(40, Math.min(dimensions.width, dimensions.height) * 0.12);
+            const startCam = forceGraphRef.current.cameraPosition();
+            forceGraphRef.current.zoomToFit(0, padding);
+            const fitted = forceGraphRef.current.cameraPosition();
+            const target = { x: fitted.x * 0.5, y: fitted.y * 0.5, z: fitted.z * 0.5 };
+            forceGraphRef.current.cameraPosition(startCam, undefined, 0);
+            forceGraphRef.current.cameraPosition(target, undefined, 1000);
+          }
+        }, 300);
 
       } catch (err) {
         console.error('Erreur lors de l\'initialisation du graphique 3D:', err);
@@ -1559,8 +1643,9 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     if (isValid && dotContent) {
       initializeGraph();
     }
-    
+
     return () => {
+      if (particlePatchInterval) clearInterval(particlePatchInterval);
       if (forceGraphRef.current) {
         forceGraphRef.current._destructor();
       }
