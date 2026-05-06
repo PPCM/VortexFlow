@@ -1,25 +1,25 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 
-const mockUseAuth = jest.fn();
-jest.mock('../../context/AuthContext', () => ({
+const mockUseAuth = vi.fn();
+vi.mock('../../context/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-const mockUseGraph = jest.fn();
-jest.mock('../../context/GraphContext', () => ({
+const mockUseGraph = vi.fn();
+vi.mock('../../context/GraphContext', () => ({
   useGraph: () => mockUseGraph(),
 }));
 
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   __esModule: true,
   default: {
-    updateProfile: jest.fn().mockResolvedValue({ success: true }),
-    changePassword: jest.fn().mockResolvedValue({ success: true }),
+    updateProfile: vi.fn().mockResolvedValue({ success: true }),
+    changePassword: vi.fn().mockResolvedValue({ success: true }),
   },
   apiService: {
-    updateProfile: jest.fn().mockResolvedValue({ success: true }),
-    changePassword: jest.fn().mockResolvedValue({ success: true }),
+    updateProfile: vi.fn().mockResolvedValue({ success: true }),
+    changePassword: vi.fn().mockResolvedValue({ success: true }),
   },
 }));
 
@@ -41,11 +41,11 @@ const FAKE_USER = {
 beforeEach(() => {
   mockUseAuth.mockReset().mockReturnValue({
     state: { user: FAKE_USER, isAuthenticated: true },
-    refreshUser: jest.fn().mockResolvedValue(undefined),
+    refreshUser: vi.fn().mockResolvedValue(undefined),
   });
   mockUseGraph.mockReset().mockReturnValue({
     state: { graphs: [{ id: 1 }, { id: 2 }] },
-    loadGraphs: jest.fn().mockResolvedValue(undefined),
+    loadGraphs: vi.fn().mockResolvedValue(undefined),
   });
 });
 
@@ -67,7 +67,7 @@ describe('UserProfile', () => {
   test('renders without crashing when auth user is null (edge case)', () => {
     mockUseAuth.mockReturnValue({
       state: { user: null, isAuthenticated: false },
-      refreshUser: jest.fn(),
+      refreshUser: vi.fn(),
     });
     expect(() => render(<UserProfile />)).not.toThrow();
   });

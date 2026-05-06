@@ -10,9 +10,9 @@ const fillField = (label: RegExp, value: string) => {
 };
 
 beforeAll(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
-afterAll(() => jest.restoreAllMocks());
+afterAll(() => vi.restoreAllMocks());
 
 const FAKE_USER = {
   id: 1,
@@ -25,8 +25,8 @@ const FAKE_USER = {
 
 const baseProps = (overrides = {}) => ({
   open: true,
-  onClose: jest.fn(),
-  onSubmit: jest.fn().mockResolvedValue(undefined),
+  onClose: vi.fn(),
+  onSubmit: vi.fn().mockResolvedValue(undefined),
   user: FAKE_USER,
   ...overrides,
 });
@@ -36,8 +36,8 @@ describe('PasswordResetDialog — rendering', () => {
     const { container } = render(
       <PasswordResetDialog
         open={true}
-        onClose={jest.fn()}
-        onSubmit={jest.fn()}
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
         user={null}
       />,
     );
@@ -99,7 +99,7 @@ describe('PasswordResetDialog — happy path', () => {
 
   test('reports an error and stays open if onSubmit throws', async () => {
     const props = baseProps({
-      onSubmit: jest.fn().mockRejectedValue(new Error('server')),
+      onSubmit: vi.fn().mockRejectedValue(new Error('server')),
     });
     render(<PasswordResetDialog {...props} />);
 

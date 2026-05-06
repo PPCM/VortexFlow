@@ -5,20 +5,20 @@ import React from 'react';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { GraphProvider, useGraph } from './GraphContext';
 
-const mockGetGraphs = jest.fn();
-const mockGetGraph = jest.fn();
-const mockCreateGraph = jest.fn();
-const mockUpdateGraphApi = jest.fn();
-const mockDeleteGraph = jest.fn();
-const mockDuplicateGraph = jest.fn();
-const mockValidateDot = jest.fn();
-const mockParseDot = jest.fn();
-const mockStartSim = jest.fn();
-const mockStopSim = jest.fn();
-const mockPauseSim = jest.fn();
-const mockHandleApiError = jest.fn((..._args: any[]) => 'mapped');
+const mockGetGraphs = vi.fn();
+const mockGetGraph = vi.fn();
+const mockCreateGraph = vi.fn();
+const mockUpdateGraphApi = vi.fn();
+const mockDeleteGraph = vi.fn();
+const mockDuplicateGraph = vi.fn();
+const mockValidateDot = vi.fn();
+const mockParseDot = vi.fn();
+const mockStartSim = vi.fn();
+const mockStopSim = vi.fn();
+const mockPauseSim = vi.fn();
+const mockHandleApiError = vi.fn((..._args: any[]) => 'mapped');
 
-jest.mock('../services/api', () => ({
+vi.mock('../services/api', () => ({
   __esModule: true,
   apiService: {
     getGraphs: (...a: any[]) => mockGetGraphs(...a),
@@ -36,12 +36,12 @@ jest.mock('../services/api', () => ({
   },
 }));
 
-const mockWsUpdateGraph = jest.fn();
-const mockWsStartSim = jest.fn();
-const mockWsStopSim = jest.fn();
-const mockWsPauseSim = jest.fn();
+const mockWsUpdateGraph = vi.fn();
+const mockWsStartSim = vi.fn();
+const mockWsStopSim = vi.fn();
+const mockWsPauseSim = vi.fn();
 
-jest.mock('../services/websocket', () => ({
+vi.mock('../services/websocket', () => ({
   __esModule: true,
   webSocketService: {
     updateGraph: (...a: any[]) => mockWsUpdateGraph(...a),
@@ -52,10 +52,10 @@ jest.mock('../services/websocket', () => ({
 }));
 
 beforeAll(() => {
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
-afterAll(() => jest.restoreAllMocks());
+afterAll(() => vi.restoreAllMocks());
 
 beforeEach(() => {
   [

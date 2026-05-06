@@ -5,16 +5,16 @@ import React from 'react';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { SimulationProvider, useSimulation } from './SimulationContext';
 
-const mockGetSessions = jest.fn();
-const mockGetSession = jest.fn();
-const mockStartSimulation = jest.fn();
-const mockStopSimulation = jest.fn();
-const mockPauseSimulation = jest.fn();
-const mockResumeSimulation = jest.fn();
-const mockGetTemplates = jest.fn();
-const mockValidateConfig = jest.fn();
+const mockGetSessions = vi.fn();
+const mockGetSession = vi.fn();
+const mockStartSimulation = vi.fn();
+const mockStopSimulation = vi.fn();
+const mockPauseSimulation = vi.fn();
+const mockResumeSimulation = vi.fn();
+const mockGetTemplates = vi.fn();
+const mockValidateConfig = vi.fn();
 
-jest.mock('../services/api', () => ({
+vi.mock('../services/api', () => ({
   __esModule: true,
   apiService: {
     getSimulationSessions: (...a: any[]) => mockGetSessions(...a),
@@ -28,13 +28,13 @@ jest.mock('../services/api', () => ({
   },
 }));
 
-const mockWsStart = jest.fn();
-const mockWsStop = jest.fn();
-const mockWsPause = jest.fn();
-const mockWsSetCallbacks = jest.fn();
-const mockWsRemoveCallbacks = jest.fn();
+const mockWsStart = vi.fn();
+const mockWsStop = vi.fn();
+const mockWsPause = vi.fn();
+const mockWsSetCallbacks = vi.fn();
+const mockWsRemoveCallbacks = vi.fn();
 
-jest.mock('../services/websocket', () => ({
+vi.mock('../services/websocket', () => ({
   __esModule: true,
   webSocketService: {
     startSimulation: (...a: any[]) => mockWsStart(...a),
@@ -46,10 +46,10 @@ jest.mock('../services/websocket', () => ({
 }));
 
 beforeAll(() => {
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
-afterAll(() => jest.restoreAllMocks());
+afterAll(() => vi.restoreAllMocks());
 
 beforeEach(() => {
   [mockGetSessions, mockGetSession, mockStartSimulation, mockStopSimulation,

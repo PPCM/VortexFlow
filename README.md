@@ -43,12 +43,14 @@ VortexFlow permet de créer, visualiser et simuler des graphiques 3D interactifs
 - Sessions serveur sécurisées
 - API REST complète
 
-### Frontend  
-- React.js avec hooks modernes
+### Frontend
+- React 19 avec hooks modernes
+- **Vite** pour le build et le dev server (CRA retiré)
+- **Vitest** pour les tests
 - Three.js pour la visualisation 3D
-- react-force-graph-3d pour les graphiques
+- 3d-force-graph pour les graphiques
 - Material-UI pour l'interface
-- Monaco Editor pour l'éditeur de code
+- Monaco Editor + CodeMirror pour l'éditeur de code
 
 ### Infrastructure
 - Docker & Docker Compose

@@ -111,7 +111,7 @@ describe('useNotifications', () => {
   });
 
   test('showNotification accepts a custom action and stores it', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     const { result } = renderHook(() => useNotifications(), { wrapper });
     act(() => {
       result.current.showNotification({

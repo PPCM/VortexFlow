@@ -2,13 +2,13 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 // Full mock of react-router-dom; v7's ESM exports don't resolve cleanly
 // through Jest, so we shim only what NotFoundPage uses.
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   __esModule: true,
   useNavigate: () => mockNavigate,
-}), { virtual: true });
+}));
 
 import NotFoundPage from './NotFoundPage';
 

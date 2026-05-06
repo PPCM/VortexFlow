@@ -6,7 +6,7 @@
 
 let lastCmProps: any = null;
 
-jest.mock('@uiw/react-codemirror', () => ({
+vi.mock('@uiw/react-codemirror', () => ({
   __esModule: true,
   default: (props: any) => {
     lastCmProps = props;
@@ -18,16 +18,22 @@ jest.mock('@uiw/react-codemirror', () => ({
 
 // Stub the language/theme/lint imports — DOTCodeMirrorEditor only needs the
 // shapes, not actual behaviour.
-jest.mock('@codemirror/theme-one-dark', () => ({ oneDark: 'oneDark-stub' }));
-jest.mock('@codemirror/view', () => ({
-  EditorView: { theme: jest.fn(() => 'theme-stub') },
+vi.mock('@codemirror/theme-one-dark', () => ({ oneDark: 'oneDark-stub' }));
+vi.mock('@codemirror/view', () => ({
+  EditorView: { theme: vi.fn(() => 'theme-stub') },
 }));
-jest.mock('@codemirror/language', () => ({
-  StreamLanguage: { define: jest.fn(() => 'lang-stub') },
-  LanguageSupport: jest.fn(() => 'support-stub'),
+vi.mock('@codemirror/language', () => ({
+  StreamLanguage: { define: vi.fn(() => 'lang-stub') },
+  // LanguageSupport is invoked with `new` in production code, so we need a
+  // real constructor (vi.fn with an arrow body can't be used as a class).
+  LanguageSupport: class LanguageSupportStub {
+    constructor() {
+      Object.assign(this, { __stub: 'support-stub' });
+    }
+  },
 }));
-jest.mock('@codemirror/lint', () => ({
-  linter: jest.fn(() => 'linter-stub'),
+vi.mock('@codemirror/lint', () => ({
+  linter: vi.fn(() => 'linter-stub'),
 }));
 
 import React from 'react';
@@ -45,7 +51,7 @@ describe('DOTCodeMirrorEditor', () => {
   });
 
   test('forwards onChange when CodeMirror emits a value change', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     render(<DOTCodeMirrorEditor value="initial" onChange={handler} />);
     lastCmProps.onChange('updated');
     expect(handler).toHaveBeenCalledWith('updated');

@@ -49,7 +49,7 @@ interface State {
 class ErrorLogger {
   static log(error: Error, errorInfo: ErrorInfo, errorId: string) {
     // Log vers la console en développement
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.MODE === 'development') {
       console.error('ErrorBoundary caught an error:', error, errorInfo);
     }
 

@@ -2,6 +2,7 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.4",
     "@codemirror/language-data": "^6.5.1",
@@ -16,10 +17,7 @@
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^13.5.0",
     "@types/d3": "^7.4.3",
-    "@types/jest": "^27.5.2",
-    "@types/node": "^16.18.126",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@uiw/react-codemirror": "^4.24.0",
@@ -29,52 +27,32 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.3",
-    "react-scripts": "5.0.1",
     "socket.io-client": "^4.8.1",
     "three": "^0.178.0",
     "three-spritetext": "^1.10.0",
-    "typescript": "^4.9.5",
+    "typescript": "^5.4.0",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+    "dev": "vite",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "@types/three": "^0.178.1"
+    "@testing-library/user-event": "^13.5.0",
+    "@types/node": "^22.19.17",
+    "@types/three": "^0.178.1",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/coverage-v8": "^4.1.5",
+    "jsdom": "^29.1.1",
+    "vite": "^8.0.10",
+    "vitest": "^4.1.5"
   },
   "overrides": {
-    "nth-check": "^2.1.1",
-    "serialize-javascript": "^6.0.2",
-    "underscore": "^1.13.7",
-    "form-data": "^4.0.4",
-    "node-forge": "^1.4.0",
-    "postcss": "^8.5.10",
-    "webpack": "^5.104.1",
-    "webpack-dev-server": "^5.2.1",
-    "path-to-regexp": "^0.1.13",
-    "qs": "^6.14.1",
-    "brace-expansion": "^2.0.3",
-    "socket.io-parser": "^4.2.6"
+    "nth-check": "^2.1.1"
   }
 }

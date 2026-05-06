@@ -1,21 +1,21 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 // LoginPage uses Link as RouterLink + useNavigate. Full-mock the module so
 // Jest doesn't try to resolve react-router-dom v7's ESM exports.
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   __esModule: true,
   useNavigate: () => mockNavigate,
   Link: ({ children, to, ...rest }: any) => <a href={typeof to === 'string' ? to : '#'} {...rest}>{children}</a>,
-}), { virtual: true });
+}));
 
-const mockLogin = jest.fn();
+const mockLogin = vi.fn();
 const mockState: { user: any; isAuthenticated: boolean; loading: boolean; error: string | null } = {
   user: null, isAuthenticated: false, loading: false, error: null,
 };
-jest.mock('../../context/AuthContext', () => ({
+vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({ login: mockLogin, state: mockState }),
 }));
 
@@ -64,9 +64,12 @@ describe('LoginPage — validation', () => {
 
   test('rejects malformed email', async () => {
     renderPage();
-    userEvent.type(screen.getByLabelText(/Adresse email/i), 'not-an-email');
-    userEvent.type(screen.getByLabelText(/Mot de passe/i), 'longenough');
-    userEvent.click(screen.getByRole('button', { name: /se connecter/i }));
+    fireEvent.change(screen.getByLabelText(/Adresse email/i), { target: { value: 'not-an-email' } });
+    fireEvent.change(screen.getByLabelText(/Mot de passe/i), { target: { value: 'longenough' } });
+    // userEvent.click on a submit button triggers a click event, but not the
+    // form's native submit event under jsdom + vitest. Fire submit directly.
+    const form = screen.getByRole('button', { name: /se connecter/i }).closest('form');
+    fireEvent.submit(form!);
     expect(await screen.findByText(/Format d'email invalide/i)).toBeInTheDocument();
     expect(mockLogin).not.toHaveBeenCalled();
   });

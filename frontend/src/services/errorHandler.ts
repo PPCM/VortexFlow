@@ -263,7 +263,7 @@ export class ErrorHandler {
     };
 
     // Log en développement
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.MODE === 'development') {
       console.group(`🚨 VortexFlow Error - ${error.code}`);
       console.error('Error:', error.message);
       console.log('Details:', logData);
@@ -277,7 +277,7 @@ export class ErrorHandler {
   private sendToMonitoringService(errorData: any): void {
     try {
       // TODO: Intégrer avec Sentry, LogRocket, ou autre service de monitoring
-      if (process.env.NODE_ENV === 'production') {
+      if (import.meta.env.MODE === 'production') {
         // Exemple d'envoi vers un endpoint de logging
         fetch('/api/errors', {
           method: 'POST',

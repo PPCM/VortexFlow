@@ -5,7 +5,7 @@
 
 let lastEditorProps: any = null;
 
-jest.mock('@monaco-editor/react', () => ({
+vi.mock('@monaco-editor/react', () => ({
   __esModule: true,
   Editor: (props: any) => {
     lastEditorProps = props;
@@ -24,15 +24,15 @@ jest.mock('@monaco-editor/react', () => ({
 // monaco-editor is dynamically imported inside useEffect; provide a virtual
 // stub so the import resolves without side effects (the package itself is not
 // installed for jsdom tests).
-jest.mock('monaco-editor', () => ({
+vi.mock('monaco-editor', () => ({
   languages: {
-    register: jest.fn(),
-    setMonarchTokensProvider: jest.fn(),
+    register: vi.fn(),
+    setMonarchTokensProvider: vi.fn(),
   },
   editor: {
-    defineTheme: jest.fn(),
+    defineTheme: vi.fn(),
   },
-}), { virtual: true });
+}));
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
@@ -61,7 +61,7 @@ describe('DOTEditor', () => {
   });
 
   test('forwards onChange when Monaco emits a value change', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     render(<DOTEditor value="initial" onChange={handler} />);
     // Simulate Monaco invoking the onChange prop.
     lastEditorProps.onChange('updated');
@@ -69,7 +69,7 @@ describe('DOTEditor', () => {
   });
 
   test('does not call onChange when Monaco emits undefined', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     render(<DOTEditor value="initial" onChange={handler} />);
     lastEditorProps.onChange(undefined);
     expect(handler).not.toHaveBeenCalled();

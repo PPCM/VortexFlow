@@ -2,22 +2,22 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', () => ({
   __esModule: true,
   useNavigate: () => mockNavigate,
   useLocation: () => ({ pathname: '/dashboard' }),
-}), { virtual: true });
+}));
 
-const mockLogout = jest.fn();
+const mockLogout = vi.fn();
 const mockState: any = { user: null };
-jest.mock('../../context/AuthContext', () => ({
+vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({ state: mockState, logout: mockLogout }),
 }));
 
 // NotificationButton imports useNotifications; stub it so we don't need the
 // provider tree just to render the AppBar.
-jest.mock('../common/NotificationButton', () => ({
+vi.mock('../common/NotificationButton', () => ({
   __esModule: true,
   default: () => <div data-testid="notif-button" />,
 }));

@@ -5,10 +5,10 @@ import ErrorBoundary from './ErrorBoundary';
 
 // Suppress React's error logging for the deliberate throws below.
 beforeAll(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
 });
-afterAll(() => jest.restoreAllMocks());
+afterAll(() => vi.restoreAllMocks());
 
 const Boom: React.FC<{ message?: string }> = ({ message = 'kaboom' }) => {
   throw new Error(message);
@@ -43,7 +43,7 @@ describe('ErrorBoundary', () => {
   });
 
   test('calls the onError callback with the error and errorInfo', () => {
-    const onError = jest.fn();
+    const onError = vi.fn();
     render(
       <ErrorBoundary onError={onError}>
         <Boom message="specific" />

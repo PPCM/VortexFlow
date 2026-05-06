@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 // Unit tests for the ApiService.
 //
 // We mock axios so the service doesn't make real HTTP calls. Each test
@@ -6,22 +7,22 @@
 
 // jest.mock is hoisted; reference inside the factory so the closure capture
 // happens at mock-init time, not at TypeScript const-init time.
-jest.mock('axios', () => {
+vi.mock('axios', () => {
   const client = {
-    get: jest.fn(),
-    post: jest.fn(),
-    put: jest.fn(),
-    delete: jest.fn(),
-    patch: jest.fn(),
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    patch: vi.fn(),
     interceptors: {
-      response: { use: jest.fn() },
-      request: { use: jest.fn() },
+      response: { use: vi.fn() },
+      request: { use: vi.fn() },
     },
   };
   return {
     __esModule: true,
-    default: { create: jest.fn(() => client) },
-    create: jest.fn(() => client),
+    default: { create: vi.fn(() => client) },
+    create: vi.fn(() => client),
   };
 });
 
@@ -34,7 +35,7 @@ const mockAxiosClient = ((axios as any).default?.create ?? axios.create).mock.re
 beforeEach(() => {
   Object.values(mockAxiosClient)
     .filter((v) => typeof v === 'function')
-    .forEach((fn) => (fn as jest.Mock).mockReset());
+    .forEach((fn) => (fn as Mock).mockReset());
 });
 
 describe('Auth methods', () => {

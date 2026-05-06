@@ -2,18 +2,18 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 const mockLocation = { pathname: '/dashboard' };
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   __esModule: true,
   useNavigate: () => mockNavigate,
   useLocation: () => mockLocation,
-}), { virtual: true });
+}));
 
-const mockLogout = jest.fn();
-const mockUseAuth = jest.fn();
-const mockUsePermissions = jest.fn();
-jest.mock('../../context/AuthContext', () => ({
+const mockLogout = vi.fn();
+const mockUseAuth = vi.fn();
+const mockUsePermissions = vi.fn();
+vi.mock('../../context/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
   usePermissions: () => mockUsePermissions(),
 }));

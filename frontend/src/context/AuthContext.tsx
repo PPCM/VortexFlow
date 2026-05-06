@@ -119,7 +119,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Rafraîchissement automatique de la session
   // =====================================
   useEffect(() => {
-    let refreshInterval: NodeJS.Timeout;
+    let refreshInterval: ReturnType<typeof setInterval>;
     
     if (state.isAuthenticated) {
       // Rafraîchir la session toutes les 30 minutes

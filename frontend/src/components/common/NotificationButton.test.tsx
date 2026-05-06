@@ -2,10 +2,10 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const mockOpenDrawer = jest.fn();
+const mockOpenDrawer = vi.fn();
 const mockUseNotifications: { unreadCount: number } = { unreadCount: 0 };
 
-jest.mock('./NotificationProvider', () => ({
+vi.mock('./NotificationProvider', () => ({
   useNotifications: () => ({
     unreadCount: mockUseNotifications.unreadCount,
     openDrawer: mockOpenDrawer,

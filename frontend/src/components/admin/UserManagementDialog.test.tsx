@@ -4,9 +4,9 @@ import userEvent from '@testing-library/user-event';
 import UserManagementDialog from './UserManagementDialog';
 
 beforeAll(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
-afterAll(() => jest.restoreAllMocks());
+afterAll(() => vi.restoreAllMocks());
 
 const fillField = (label: RegExp, value: string) => {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -23,8 +23,8 @@ const fakeUser = {
 
 const baseProps = (overrides = {}) => ({
   open: true,
-  onClose: jest.fn(),
-  onSubmit: jest.fn().mockResolvedValue(undefined),
+  onClose: vi.fn(),
+  onSubmit: vi.fn().mockResolvedValue(undefined),
   ...overrides,
 });
 
@@ -124,16 +124,16 @@ describe('UserManagementDialog — edit mode', () => {
 
     rerender(
       <UserManagementDialog
-        {...baseProps({ user: fakeUser, onDelete: jest.fn() })}
+        {...baseProps({ user: fakeUser, onDelete: vi.fn() })}
       />,
     );
     expect(screen.getByRole('button', { name: /^Supprimer$/i })).toBeInTheDocument();
   });
 
   test('Supprimer asks for confirmation before calling onDelete', async () => {
-    const onDelete = jest.fn().mockResolvedValue(undefined);
-    const onClose = jest.fn();
-    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(
       <UserManagementDialog
@@ -149,8 +149,8 @@ describe('UserManagementDialog — edit mode', () => {
   });
 
   test('does not delete when the user cancels the confirm dialog', () => {
-    const onDelete = jest.fn();
-    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    const onDelete = vi.fn();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
 
     render(<UserManagementDialog {...baseProps({ user: fakeUser, onDelete })} />);
     userEvent.click(screen.getByRole('button', { name: /^Supprimer$/i }));

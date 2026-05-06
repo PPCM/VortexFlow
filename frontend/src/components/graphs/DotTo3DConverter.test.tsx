@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 // Tests for the pure-logic DOT→3D converter helpers exposed by
 // GraphRenderer3D. The renderer itself is React + 3d-force-graph + three.js
 // and is not exercised here; we only test the static methods that take
@@ -6,18 +7,18 @@
 // 3d-force-graph and three.js use Canvas/WebGL APIs that jsdom does not
 // implement, so we stub them at import time.
 
-jest.mock('3d-force-graph', () => ({ __esModule: true, default: jest.fn() }));
-jest.mock('three', () => ({}));
-jest.mock('three-spritetext', () => ({ __esModule: true, default: jest.fn() }));
+vi.mock('3d-force-graph', () => ({ __esModule: true, default: vi.fn() }));
+vi.mock('three', () => ({}));
+vi.mock('three-spritetext', () => ({ __esModule: true, default: vi.fn() }));
 
 import { DotTo3DConverter } from './GraphRenderer3D';
 
 beforeAll(() => {
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'warn').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
-afterAll(() => jest.restoreAllMocks());
+afterAll(() => vi.restoreAllMocks());
 
 const Cls = DotTo3DConverter as any;
 
@@ -262,14 +263,14 @@ describe('convertBackendDataToGraph', () => {
 // ----------------------------------------------------------------------------
 describe('parseDotToGraphData (network-aware)', () => {
   beforeEach(() => {
-    (global as any).fetch = jest.fn();
+    (globalThis as any).fetch = vi.fn();
   });
   afterEach(() => {
-    delete (global as any).fetch;
+    delete (globalThis as any).fetch;
   });
 
   test('uses backend payload when fetch succeeds', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
+    (globalThis.fetch as Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
         nodes: [{ id: 'X' }],
@@ -282,7 +283,7 @@ describe('parseDotToGraphData (network-aware)', () => {
   });
 
   test('falls back to frontend parsing when fetch returns non-ok', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({
+    (globalThis.fetch as Mock).mockResolvedValue({
       ok: false,
       status: 500,
       text: async () => 'server error',
@@ -292,7 +293,7 @@ describe('parseDotToGraphData (network-aware)', () => {
   });
 
   test('falls back to frontend parsing when fetch throws', async () => {
-    (global.fetch as jest.Mock).mockRejectedValue(new Error('offline'));
+    (globalThis.fetch as Mock).mockRejectedValue(new Error('offline'));
     const r = await DotTo3DConverter.parseDotToGraphData('digraph G { A -> B }');
     expect(r.nodes.map((n) => n.id).sort()).toEqual(['A', 'B']);
   });

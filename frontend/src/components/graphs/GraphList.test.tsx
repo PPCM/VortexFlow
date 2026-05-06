@@ -2,23 +2,23 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', () => ({
   __esModule: true,
   useNavigate: () => mockNavigate,
-}), { virtual: true });
+}));
 
-const mockUseGraph = jest.fn();
-jest.mock('../../context/GraphContext', () => ({
+const mockUseGraph = vi.fn();
+vi.mock('../../context/GraphContext', () => ({
   useGraph: () => mockUseGraph(),
 }));
 
-const mockUsePermissions = jest.fn();
-jest.mock('../../context/AuthContext', () => ({
+const mockUsePermissions = vi.fn();
+vi.mock('../../context/AuthContext', () => ({
   usePermissions: () => mockUsePermissions(),
 }));
 
-jest.mock('../common/LoadingPage', () => ({
+vi.mock('../common/LoadingPage', () => ({
   __esModule: true,
   default: ({ message }: any) => <div data-testid="loading">{message}</div>,
 }));
@@ -42,9 +42,9 @@ const baseGraphCtx = (overrides: any = {}) => ({
     loading: false,
     ...overrides.state,
   },
-  loadGraphs: jest.fn(),
-  deleteGraph: jest.fn().mockResolvedValue(true),
-  duplicateGraph: jest.fn().mockResolvedValue(true),
+  loadGraphs: vi.fn(),
+  deleteGraph: vi.fn().mockResolvedValue(true),
+  duplicateGraph: vi.fn().mockResolvedValue(true),
   ...overrides,
 });
 

@@ -1,37 +1,38 @@
+import type { Mock } from 'vitest';
 // Unit tests for the WebSocketService.
 // socket.io-client is mocked; we drive the service directly and verify it
 // forwards calls to the socket only when connected.
 
-jest.mock('socket.io-client', () => {
+vi.mock('socket.io-client', () => {
   const socket = {
     id: 'sock-test',
     connected: true,
-    emit: jest.fn(),
-    on: jest.fn(),
-    off: jest.fn(),
-    disconnect: jest.fn(),
+    emit: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
+    disconnect: vi.fn(),
   };
   return {
     __esModule: true,
-    io: jest.fn(() => socket),
-    default: jest.fn(() => socket),
+    io: vi.fn(() => socket),
+    default: vi.fn(() => socket),
     Socket: function Socket() {},
   };
 });
 
 // Suppress the service's verbose console.log noise.
 beforeAll(() => {
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterAll(() => {
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
 });
 
 import { io } from 'socket.io-client';
 import { webSocketService } from './websocket';
 
-const mockSocket = (io as unknown as jest.Mock).mock.results[0].value;
+const mockSocket = (io as unknown as Mock).mock.results[0].value;
 
 const setConnected = (v: boolean) => {
   // @ts-ignore — internal field, set so emit-guarded methods proceed
@@ -139,8 +140,8 @@ describe('WebSocketService — emit-guarded methods', () => {
 
 describe('WebSocketService — utilities', () => {
   test('setCallbacks merges new callbacks into existing ones', () => {
-    const cb1 = jest.fn();
-    const cb2 = jest.fn();
+    const cb1 = vi.fn();
+    const cb2 = vi.fn();
     webSocketService.setCallbacks({ onConnect: cb1 });
     webSocketService.setCallbacks({ onDisconnect: cb2 });
     // @ts-ignore — peek at private field
@@ -150,7 +151,7 @@ describe('WebSocketService — utilities', () => {
   });
 
   test('removeCallbacks empties the callback bag', () => {
-    webSocketService.setCallbacks({ onConnect: jest.fn() });
+    webSocketService.setCallbacks({ onConnect: vi.fn() });
     webSocketService.removeCallbacks();
     // @ts-ignore
     expect(webSocketService.callbacks).toEqual({});
@@ -170,7 +171,7 @@ describe('WebSocketService — utilities', () => {
   });
 
   test('on/off forward to the underlying socket', () => {
-    const cb = jest.fn();
+    const cb = vi.fn();
     webSocketService.on('foo', cb);
     expect(mockSocket.on).toHaveBeenCalledWith('foo', cb);
 

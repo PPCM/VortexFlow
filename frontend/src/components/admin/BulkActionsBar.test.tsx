@@ -4,10 +4,10 @@ import userEvent from '@testing-library/user-event';
 import BulkActionsBar from './BulkActionsBar';
 
 const handlers = () => ({
-  onActivate: jest.fn(),
-  onDeactivate: jest.fn(),
-  onDelete: jest.fn(),
-  onClear: jest.fn(),
+  onActivate: vi.fn(),
+  onDeactivate: vi.fn(),
+  onDelete: vi.fn(),
+  onClear: vi.fn(),
 });
 
 describe('BulkActionsBar — selection counter', () => {

@@ -1,37 +1,37 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', () => ({
   __esModule: true,
   useNavigate: () => mockNavigate,
-}), { virtual: true });
+}));
 
-const mockGetDashboardStats = jest.fn();
-jest.mock('../../services/api', () => ({
+const mockGetDashboardStats = vi.fn();
+vi.mock('../../services/api', () => ({
   apiService: {
     getDashboardStats: (...a: any[]) => mockGetDashboardStats(...a),
   },
 }));
 
-const mockUseAuth = jest.fn();
-const mockUsePermissions = jest.fn();
-jest.mock('../../context/AuthContext', () => ({
+const mockUseAuth = vi.fn();
+const mockUsePermissions = vi.fn();
+vi.mock('../../context/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
   usePermissions: () => mockUsePermissions(),
 }));
 
-const mockUseGraph = jest.fn();
-jest.mock('../../context/GraphContext', () => ({
+const mockUseGraph = vi.fn();
+vi.mock('../../context/GraphContext', () => ({
   useGraph: () => mockUseGraph(),
 }));
 
-const mockUseSimulation = jest.fn();
-jest.mock('../../context/SimulationContext', () => ({
+const mockUseSimulation = vi.fn();
+vi.mock('../../context/SimulationContext', () => ({
   useSimulation: () => mockUseSimulation(),
 }));
 
-jest.mock('../common/LoadingPage', () => ({
+vi.mock('../common/LoadingPage', () => ({
   __esModule: true,
   default: ({ message }: { message?: string }) => (
     <div data-testid="loading">{message ?? 'Loading'}</div>
@@ -41,10 +41,10 @@ jest.mock('../common/LoadingPage', () => ({
 import Dashboard from './Dashboard';
 
 beforeAll(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
 });
-afterAll(() => jest.restoreAllMocks());
+afterAll(() => vi.restoreAllMocks());
 
 beforeEach(() => {
   mockNavigate.mockReset();
@@ -58,11 +58,11 @@ beforeEach(() => {
   });
   mockUseGraph.mockReset().mockReturnValue({
     state: { graphs: [{ id: 1, title: 'G1' }] },
-    loadGraphs: jest.fn().mockResolvedValue(undefined),
+    loadGraphs: vi.fn().mockResolvedValue(undefined),
   });
   mockUseSimulation.mockReset().mockReturnValue({
     state: { sessions: [] },
-    actions: { loadSessions: jest.fn().mockResolvedValue(undefined) },
+    actions: { loadSessions: vi.fn().mockResolvedValue(undefined) },
   });
 });
 
@@ -89,7 +89,7 @@ describe('Dashboard', () => {
     mockGetDashboardStats.mockResolvedValue({ success: false });
     mockUseGraph.mockReturnValue({
       state: { graphs: [{ id: 1 }, { id: 2 }] },
-      loadGraphs: jest.fn().mockResolvedValue(undefined),
+      loadGraphs: vi.fn().mockResolvedValue(undefined),
     });
     mockUseSimulation.mockReturnValue({
       state: {
@@ -98,7 +98,7 @@ describe('Dashboard', () => {
           { id: 's2', status: 'completed' },
         ],
       },
-      actions: { loadSessions: jest.fn().mockResolvedValue(undefined) },
+      actions: { loadSessions: vi.fn().mockResolvedValue(undefined) },
     });
 
     render(<Dashboard />);

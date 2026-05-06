@@ -12,14 +12,14 @@ import type { AxiosError } from 'axios';
 
 // ErrorHandler logs via console in dev mode; suppress to keep test output clean.
 beforeAll(() => {
-  jest.spyOn(console, 'group').mockImplementation(() => {});
-  jest.spyOn(console, 'groupEnd').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'group').mockImplementation(() => {});
+  vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
 });
 
 afterAll(() => {
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
 });
 
 const makeAxiosError = (overrides: Partial<AxiosError> = {}): AxiosError => ({

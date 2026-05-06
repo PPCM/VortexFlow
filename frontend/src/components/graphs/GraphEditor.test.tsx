@@ -2,36 +2,36 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const mockNavigate = jest.fn();
-const mockUseParams = jest.fn(() => ({}));
-jest.mock('react-router-dom', () => ({
+const mockNavigate = vi.fn();
+const mockUseParams = vi.fn(() => ({}));
+vi.mock('react-router-dom', () => ({
   __esModule: true,
   useNavigate: () => mockNavigate,
   useParams: () => mockUseParams(),
-}), { virtual: true });
+}));
 
-const mockUseGraph = jest.fn();
-jest.mock('../../context/GraphContext', () => ({
+const mockUseGraph = vi.fn();
+vi.mock('../../context/GraphContext', () => ({
   useGraph: () => mockUseGraph(),
 }));
 
-jest.mock('../../services/websocket', () => ({
+vi.mock('../../services/websocket', () => ({
   useWebSocket: () => ({
-    connect: jest.fn(),
-    disconnect: jest.fn(),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
     isConnected: () => false,
-    on: jest.fn(),
-    off: jest.fn(),
-    emit: jest.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
+    emit: vi.fn(),
   }),
 }));
 
-jest.mock('../common/LoadingPage', () => ({
+vi.mock('../common/LoadingPage', () => ({
   __esModule: true,
   default: ({ message }: any) => <div data-testid="loading">{message}</div>,
 }));
 
-jest.mock('./DOTCodeMirrorEditor', () => ({
+vi.mock('./DOTCodeMirrorEditor', () => ({
   __esModule: true,
   default: ({ value, onChange }: any) => (
     <textarea
@@ -42,7 +42,7 @@ jest.mock('./DOTCodeMirrorEditor', () => ({
   ),
 }));
 
-jest.mock('./GraphRenderer3D', () => ({
+vi.mock('./GraphRenderer3D', () => ({
   __esModule: true,
   default: () => <div data-testid="renderer-3d" />,
 }));
@@ -57,14 +57,14 @@ const baseCtx = (overrides: any = {}) => ({
     error: null,
     ...overrides.state,
   },
-  loadGraph: jest.fn().mockResolvedValue(undefined),
-  saveGraph: jest.fn().mockResolvedValue(true),
-  createGraph: jest.fn().mockResolvedValue(true),
-  updateGraph: jest.fn().mockResolvedValue(true),
-  validateDot: jest.fn().mockResolvedValue({ isValid: true, errors: [], warnings: [] }),
-  parseDot: jest.fn().mockResolvedValue({ nodes: [], edges: [] }),
-  startSimulation: jest.fn(),
-  stopSimulation: jest.fn(),
+  loadGraph: vi.fn().mockResolvedValue(undefined),
+  saveGraph: vi.fn().mockResolvedValue(true),
+  createGraph: vi.fn().mockResolvedValue(true),
+  updateGraph: vi.fn().mockResolvedValue(true),
+  validateDot: vi.fn().mockResolvedValue({ isValid: true, errors: [], warnings: [] }),
+  parseDot: vi.fn().mockResolvedValue({ nodes: [], edges: [] }),
+  startSimulation: vi.fn(),
+  stopSimulation: vi.fn(),
   ...overrides,
 });
 

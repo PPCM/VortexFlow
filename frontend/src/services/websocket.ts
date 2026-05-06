@@ -7,7 +7,7 @@ import { SocketEvent, SimulationState, User } from '../types';
 // =====================================
 // Configuration WebSocket
 // =====================================
-const WEBSOCKET_URL = process.env.REACT_APP_WS_URL || 'http://localhost:3001';
+const WEBSOCKET_URL = import.meta.env.VITE_WS_URL || 'http://localhost:3001';
 
 export interface WebSocketCallbacks {
   onConnect?: () => void;

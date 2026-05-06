@@ -1,43 +1,43 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 
-const mockNavigate = jest.fn();
-const mockUseParams = jest.fn();
-jest.mock('react-router-dom', () => ({
+const mockNavigate = vi.fn();
+const mockUseParams = vi.fn();
+vi.mock('react-router-dom', () => ({
   __esModule: true,
   useNavigate: () => mockNavigate,
   useParams: () => mockUseParams(),
-}), { virtual: true });
+}));
 
-const mockUseGraph = jest.fn();
-jest.mock('../../context/GraphContext', () => ({
+const mockUseGraph = vi.fn();
+vi.mock('../../context/GraphContext', () => ({
   useGraph: () => mockUseGraph(),
 }));
 
-const mockUsePermissions = jest.fn();
-jest.mock('../../context/AuthContext', () => ({
+const mockUsePermissions = vi.fn();
+vi.mock('../../context/AuthContext', () => ({
   usePermissions: () => mockUsePermissions(),
 }));
 
-jest.mock('../../services/websocket', () => ({
+vi.mock('../../services/websocket', () => ({
   useWebSocket: () => ({
-    connect: jest.fn(),
-    disconnect: jest.fn(),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
     isConnected: () => false,
-    on: jest.fn(),
-    off: jest.fn(),
-    emit: jest.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
+    emit: vi.fn(),
   }),
 }));
 
-jest.mock('../common/LoadingPage', () => ({
+vi.mock('../common/LoadingPage', () => ({
   __esModule: true,
   default: ({ message }: any) => <div data-testid="loading">{message}</div>,
 }));
 
 // GraphRenderer3D pulls 3d-force-graph + three.js (ESM, requires Canvas/WebGL).
 // Stub it so the Viewer test stays hermetic.
-jest.mock('./GraphRenderer3D', () => ({
+vi.mock('./GraphRenderer3D', () => ({
   __esModule: true,
   default: () => <div data-testid="renderer-3d" />,
 }));
@@ -52,10 +52,10 @@ const baseCtx = (overrides: any = {}) => ({
     error: null,
     ...overrides.state,
   },
-  loadGraph: jest.fn().mockResolvedValue(undefined),
-  startSimulation: jest.fn(),
-  stopSimulation: jest.fn(),
-  pauseSimulation: jest.fn(),
+  loadGraph: vi.fn().mockResolvedValue(undefined),
+  startSimulation: vi.fn(),
+  stopSimulation: vi.fn(),
+  pauseSimulation: vi.fn(),
   simulationState: null,
   ...overrides,
 });

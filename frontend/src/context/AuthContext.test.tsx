@@ -6,13 +6,13 @@ import React from 'react';
 import { render, renderHook, waitFor, act } from '@testing-library/react';
 import { AuthProvider, useAuth, usePermissions, ProtectedRoute } from './AuthContext';
 
-const mockGetCurrentUser = jest.fn();
-const mockLogin = jest.fn();
-const mockRegister = jest.fn();
-const mockLogout = jest.fn();
-const mockHandleApiError = jest.fn((...args: any[]) => args[0]?.message ?? 'unknown');
+const mockGetCurrentUser = vi.fn();
+const mockLogin = vi.fn();
+const mockRegister = vi.fn();
+const mockLogout = vi.fn();
+const mockHandleApiError = vi.fn((...args: any[]) => args[0]?.message ?? 'unknown');
 
-jest.mock('../services/api', () => ({
+vi.mock('../services/api', () => ({
   __esModule: true,
   apiService: {
     getCurrentUser: (...a: any[]) => mockGetCurrentUser(...a),
@@ -31,12 +31,12 @@ jest.mock('../services/api', () => ({
 }));
 
 beforeAll(() => {
-  jest.spyOn(console, 'log').mockImplementation(() => {});
-  jest.spyOn(console, 'warn').mockImplementation(() => {});
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterAll(() => {
-  jest.restoreAllMocks();
+  vi.restoreAllMocks();
 });
 
 beforeEach(() => {

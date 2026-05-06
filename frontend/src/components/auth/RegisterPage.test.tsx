@@ -1,21 +1,21 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', () => ({
   __esModule: true,
   useNavigate: () => mockNavigate,
   Link: ({ children, to, ...rest }: any) => (
     <a href={typeof to === 'string' ? to : '#'} {...rest}>{children}</a>
   ),
-}), { virtual: true });
+}));
 
-const mockRegister = jest.fn();
+const mockRegister = vi.fn();
 const mockState: { user: any; isAuthenticated: boolean; loading: boolean; error: string | null } = {
   user: null, isAuthenticated: false, loading: false, error: null,
 };
-jest.mock('../../context/AuthContext', () => ({
+vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({ register: mockRegister, state: mockState }),
 }));
 
@@ -77,11 +77,13 @@ describe('RegisterPage — validation', () => {
 
   test('rejects malformed email', async () => {
     render(<RegisterPage />);
-    userEvent.type(screen.getByLabelText(/Nom d'utilisateur/i), 'alice');
-    userEvent.type(screen.getByLabelText(/Adresse email/i), 'not-an-email');
-    userEvent.type(screen.getByLabelText(/^Mot de passe/i), 'password1');
-    userEvent.type(screen.getByLabelText(/Confirmer le mot de passe/i), 'password1');
-    userEvent.click(screen.getByRole('button', { name: /^Créer le compte$/i }));
+    fireEvent.change(screen.getByLabelText(/Nom d'utilisateur/i), { target: { value: 'alice' } });
+    fireEvent.change(screen.getByLabelText(/Adresse email/i), { target: { value: 'not-an-email' } });
+    fireEvent.change(screen.getByLabelText(/^Mot de passe/i), { target: { value: 'password1' } });
+    fireEvent.change(screen.getByLabelText(/Confirmer le mot de passe/i), { target: { value: 'password1' } });
+    // jsdom + vitest doesn't fire the form's submit event from a button click.
+    const form = screen.getByRole('button', { name: /^Créer le compte$/i }).closest('form');
+    fireEvent.submit(form!);
 
     expect(await screen.findByText(/Format d'email invalide/i)).toBeInTheDocument();
   });
