@@ -143,7 +143,7 @@ describe('LoginPage — demo button', () => {
     userEvent.click(screen.getByRole('button', { name: /connexion démo/i }));
 
     await waitFor(() => expect(mockLogin).toHaveBeenCalledWith({
-      email: 'admin@admin.com', password: 'admin123',
+      email: 'admin@admin.com', password: 'VortexFlow2024!',
     }));
   });
 });

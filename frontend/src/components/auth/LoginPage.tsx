@@ -99,11 +99,12 @@ const LoginPage: React.FC = () => {
   };
 
   const handleDemoLogin = async () => {
+    // Matches the seeded admin password (utils/setup.js::setupAdminUser).
     const demoCredentials: LoginCredentials = {
       email: 'admin@admin.com',
-      password: 'admin123',
+      password: 'VortexFlow2024!',
     };
-    
+
     const success = await login(demoCredentials);
     if (success) {
       navigate('/dashboard');
