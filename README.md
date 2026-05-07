@@ -1,5 +1,7 @@
 # VortexFlow
 
+[![CI](https://github.com/PPCM/VortexFlow/actions/workflows/ci.yml/badge.svg)](https://github.com/PPCM/VortexFlow/actions/workflows/ci.yml)
+
 **Application web de visualisation 3D de graphiques DOT avec simulation de flux de données**
 
 VortexFlow permet de créer, visualiser et simuler des graphiques 3D interactifs à partir du langage DOT (Graphviz) avec des extensions pour la simulation de flux de données.
