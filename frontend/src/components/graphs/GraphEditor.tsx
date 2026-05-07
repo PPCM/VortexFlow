@@ -4,14 +4,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
-  Grid,
   Paper,
   TextField,
   Button,
   Typography,
-  Card,
-  CardContent,
-  CardActions,
   Alert,
   Tabs,
   Tab,
@@ -29,21 +25,18 @@ import {
   Save,
   PlayArrow,
   Stop,
-  Refresh,
   Settings,
   Code,
   Visibility,
   CheckCircle,
   Error,
-  Warning,
   FiberNew,
-  Edit,
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import DOTCodeMirrorEditor from './DOTCodeMirrorEditor';
 import { useGraph } from '../../context/GraphContext';
 import { useWebSocket } from '../../services/websocket';
-import { Graph, DOTValidationResult, SimulationConfig } from '../../types';
+import { DOTValidationResult, SimulationConfig } from '../../types';
 import LoadingPage from '../common/LoadingPage';
 import GraphRenderer3D from './GraphRenderer3D';
 
@@ -77,7 +70,6 @@ const GraphEditor: React.FC = () => {
     saveGraph,
     createGraph,
     validateDot,
-    parseDot,
     simulationState,
     startSimulation,
     stopSimulation,

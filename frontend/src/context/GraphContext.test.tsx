@@ -2,7 +2,7 @@
 // simulation start/stop/pause, selection toggling, filters.
 
 import React from 'react';
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { GraphProvider, useGraph } from './GraphContext';
 
 const mockGetGraphs = vi.fn();

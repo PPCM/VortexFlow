@@ -135,6 +135,7 @@ const AdminPanel: React.FC = () => {
   // Chargement initial
   useEffect(() => {
     loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Chargement des données quand on change d'onglet
@@ -144,6 +145,7 @@ const AdminPanel: React.FC = () => {
     else if (activeTab === 3) loadSimulations();
     else if (activeTab === 4) loadActivities();
     else if (activeTab === 5) loadSystemInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   // Rechargement des utilisateurs quand les filtres changent
@@ -151,6 +153,7 @@ const AdminPanel: React.FC = () => {
     if (activeTab === 1) {
       loadUsers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userFilters]);
 
   // Fonctions de chargement des données

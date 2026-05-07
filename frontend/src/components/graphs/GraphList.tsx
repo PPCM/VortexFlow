@@ -4,7 +4,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box,
-  Grid,
   Card,
   CardContent,
   CardActions,
@@ -30,7 +29,6 @@ import {
 import {
   Search,
   Add,
-  FilterList,
   Visibility,
   Edit,
   Delete,
@@ -50,7 +48,7 @@ import LoadingPage from '../common/LoadingPage';
 const GraphList: React.FC = () => {
   const navigate = useNavigate();
   const { state, loadGraphs, deleteGraph, duplicateGraph } = useGraph();
-  const { canEdit, canAdmin } = usePermissions();
+  const { canEdit } = usePermissions();
 
   // États locaux
   const [searchTerm, setSearchTerm] = useState('');

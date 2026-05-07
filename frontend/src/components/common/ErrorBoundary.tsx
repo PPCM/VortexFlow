@@ -14,14 +14,12 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  IconButton,
   Divider,
 } from '@mui/material';
 import {
   Error,
   Refresh,
   Home,
-  BugReport,
   ExpandMore,
   ContentCopy,
   Send,

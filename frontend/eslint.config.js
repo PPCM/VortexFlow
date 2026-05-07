@@ -71,7 +71,11 @@ export default [
     rules: {
       // Real-bug catchers, formatting left to TypeScript / editor.
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^(_|err|error)$',
+      }],
       'no-undef': 'off', // TypeScript handles this
       'no-empty': ['warn', { allowEmptyCatch: true }],
       'no-prototype-builtins': 'off',

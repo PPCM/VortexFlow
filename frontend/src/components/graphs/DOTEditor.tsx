@@ -3,7 +3,6 @@
 
 import React, { useEffect } from 'react';
 import { Editor } from '@monaco-editor/react';
-import { editor } from 'monaco-editor';
 
 interface DOTEditorProps {
   value: string;
@@ -50,7 +49,7 @@ const DOTEditor: React.FC<DOTEditorProps> = ({
             [/"/, 'string', '@string'],
             
             // Nombres
-            [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
+            [/\d*\.\d+([eE][-+]?\d+)?/, 'number.float'],
             [/\d+/, 'number'],
             
             // Opérateurs et délimiteurs

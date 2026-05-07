@@ -13,34 +13,20 @@ import {
   Drawer,
   Divider,
 } from '@mui/material';
-import { 
-  Settings as SettingsIcon, 
-  ArrowRightAlt as ArrowIcon, 
-  ScatterPlot as ParticlesIcon, 
-  Label as LabelIcon, 
-  Link as LinkIcon, 
-  AutoFixHigh as EffectsIcon, 
-  ExpandLess as ExpandLessIcon, 
-  ExpandMore as ExpandMoreIcon, 
-  BarChart as StatsIcon, 
-  Speed as SpeedIcon, 
-  AccountTree as NodesIcon,
-  OpenInFull as SpacingIcon,
-  RadioButtonUnchecked as NodeSizeIcon,
-  ArrowForward as ArrowForwardIcon,
-  BlurOn as BlurOnIcon,
+import {
+  ArrowRightAlt as ArrowIcon,
+  ScatterPlot as ParticlesIcon,
+  Label as LabelIcon,
   TextFields as TextFieldsIcon,
   FlashOn as FlashOnIcon,
   PlayArrow as PlayArrowIcon,
   Pause as PauseIcon,
-  Timeline as CurveIcon,
-  LineWeight as WidthIcon,
-  Tune as TuneIcon
+  Tune as TuneIcon,
 } from '@mui/icons-material';
 import ForceGraph3D from '3d-force-graph';
 import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
-import { GraphData, GraphNode, GraphEdge } from '../../types';
+import { GraphData } from '../../types';
 
 // Déclaration de type pour THREE.js global
 declare global {
@@ -520,7 +506,7 @@ export class DotTo3DConverter {
 const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   dotContent,
   isValid,
-  parsedData,
+  parsedData: _parsedData,
   isSimulationRunning,
   onToggleSimulation,
 }) => {
@@ -564,12 +550,6 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   
   // Drawer des paramètres avancés (sliders) — fermé par défaut.
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false);
-
-  // Type pour la position
-  interface Position {
-    x: number;
-    y: number;
-  }
 
   // État pour stocker les données du graphique
   const [currentGraphData, setCurrentGraphData] = useState<{nodes: ForceGraphNode[], links: ForceGraphLink[]}>({nodes: [], links: []});
@@ -642,16 +622,6 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       resizeObserver.disconnect();
     };
   }, []);
-
-  // Callback pour linkThreeObject qui réagit aux changements de showLinkText
-  const linkLabelCallback = useCallback((link: any) => {
-    console.log('linkLabelCallback called with:', link, 'showLinkText:', showLinkText); // Debug callback call
-    if (!showLinkText) return ''; // Pas de texte si désactivé
-    // Vérifier plusieurs sources possibles pour le nom du lien
-    const linkText = link.label || link.name || link.id || '';
-    console.log('Link label result:', linkText); // Debug result
-    return linkText;
-  }, [showLinkText]);
 
   // Callback pour nodeThreeObject qui réagit aux changements de showNodeText
   const nodeThreeObjectCallback = useCallback((node: any) => {
@@ -1049,7 +1019,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   }, [showNodeText, nodeThreeObjectCallback, isInitialLoad]);
 
   // État pour les overlays de texte
-  const [textOverlays, setTextOverlays] = useState<Array<{id: string, x: number, y: number, text: string, type: 'node' | 'link'}>>([]);
+  const [, setTextOverlays] = useState<Array<{id: string, x: number, y: number, text: string, type: 'node' | 'link'}>>([]);
   
   // Fonction pour mettre à jour les positions des overlays
   const updateTextOverlays = useCallback(() => {
@@ -1121,7 +1091,6 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   useEffect(() => {
     if (!forceGraphRef.current) return;
     
-    const graph = forceGraphRef.current;
     let animationFrame: number;
     
     const updateLoop = () => {
@@ -1277,8 +1246,11 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         // 3d-force-graph creates link directional particles with a
         // MeshLambertMaterial that has transparent=true and opacity=undefined,
         // which renders as fully transparent. Walk the scene every 200ms and
-        // force them opaque so the particles are visible.
+        // force them opaque so the particles are visible. Stop after 5s —
+        // by then every particle that will ever exist has been instantiated
+        // at least once, and re-running on every animation frame is wasted.
         const sceneRoot = graph.scene();
+        const patchStartedAt = performance.now();
         particlePatchInterval = setInterval(() => {
           sceneRoot.traverse((obj: any) => {
             if (
@@ -1293,6 +1265,10 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
               obj.material.needsUpdate = true;
             }
           });
+          if (performance.now() - patchStartedAt > 5000 && particlePatchInterval) {
+            clearInterval(particlePatchInterval);
+            particlePatchInterval = null;
+          }
         }, 200);
 
         // Appliquer les paramètres initiaux

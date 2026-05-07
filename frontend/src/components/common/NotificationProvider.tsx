@@ -9,7 +9,6 @@ import {
   IconButton,
   Box,
   Typography,
-  Badge,
   Drawer,
   List,
   ListItem,
@@ -20,18 +19,14 @@ import {
   Divider,
   Button,
   Chip,
-  Paper,
 } from '@mui/material';
 import {
-  Close,
   CheckCircle,
   Error as ErrorIcon,
   Warning,
   Info,
-  Notifications,
   NotificationsNone,
   Delete,
-  MarkAsUnread,
   Circle,
 } from '@mui/icons-material';
 

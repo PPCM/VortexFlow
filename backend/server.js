@@ -49,8 +49,10 @@ redisClient.on('ready', () => {
 // Connect to Redis
 redisClient.connect().catch(console.error);
 
-// WebSocket server setup
-const io = socketIo(server, {
+// WebSocket server setup — attaches handlers to `server` as a side effect.
+// The simulation handler used to live here; now sims run client-side, but
+// graph-collab events (cursor, chat, graph-update) still flow through it.
+socketIo(server, {
   cors: {
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
     methods: ["GET", "POST"],

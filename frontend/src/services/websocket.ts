@@ -2,7 +2,7 @@
 // Gestion des connexions temps réel avec Socket.IO
 
 import { io, Socket } from 'socket.io-client';
-import { SocketEvent, SimulationState, User } from '../types';
+import { User } from '../types';
 
 // =====================================
 // Configuration WebSocket

@@ -2,7 +2,7 @@
 // Gestion globale des graphiques et données 3D
 
 import React, { createContext, useContext, useReducer, useCallback, ReactNode } from 'react';
-import { Graph, GraphData, GraphNode, GraphEdge, GraphFilters, SimulationState, SimulationConfig } from '../types';
+import { Graph, GraphData, GraphFilters, SimulationState, SimulationConfig } from '../types';
 import { apiService } from '../services/api';
 import { webSocketService } from '../services/websocket';
 

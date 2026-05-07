@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Grid,
   Card,
   CardContent,
   CardActions,
@@ -13,14 +12,12 @@ import {
   Button,
   Avatar,
   IconButton,
-  Divider,
   List,
   ListItem,
   ListItemText,
   ListItemIcon,
   ListItemSecondaryAction,
   Switch,
-  FormControlLabel,
   Alert,
   Dialog,
   DialogTitle,
@@ -39,10 +36,7 @@ import {
   PhotoCamera,
   Security,
   Notifications,
-  Palette,
-  Language,
   AccountTree,
-  TrendingUp,
   Settings,
   Visibility,
   VisibilityOff,
@@ -194,7 +188,7 @@ const UserProfile: React.FC = () => {
   const handleSaveProfile = async () => {
     setLoading(true);
     try {
-      const response = await apiService.updateUserProfile(userData);
+      await apiService.updateUserProfile(userData);
       await refreshUser();
       setEditing(false);
       setMessage({ type: 'success', text: 'Profil mis à jour avec succès' });

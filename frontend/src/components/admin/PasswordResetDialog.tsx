@@ -23,7 +23,6 @@ import {
   VpnKey as VpnKeyIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
-  Person as PersonIcon,
   Security as SecurityIcon
 } from '@mui/icons-material';
 

@@ -4,7 +4,6 @@
 // instance and the DOT parser are mocked so we can assert what the
 // component asks them to do without spinning up Three.js or the backend.
 
-import type { Mock } from 'vitest';
 import React from 'react';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 

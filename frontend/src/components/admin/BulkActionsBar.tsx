@@ -6,13 +6,8 @@
 import React from 'react';
 import {
   Box,
-  Paper,
   Typography,
   Button,
-  Chip,
-  Divider,
-  Collapse,
-  Alert,
   IconButton,
   Tooltip
 } from '@mui/material';
@@ -21,7 +16,6 @@ import {
   Block as DeactivateIcon,
   Delete as DeleteIcon,
   Close as CloseIcon,
-  Warning as WarningIcon
 } from '@mui/icons-material';
 
 interface BulkActionsBarProps {

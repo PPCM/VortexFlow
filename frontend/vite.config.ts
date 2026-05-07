@@ -12,6 +12,26 @@ export default defineConfig({
   build: {
     outDir: 'build',
     sourcemap: true,
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        // Split the two heaviest third-party stacks (Three.js + the force-graph
+        // helpers, and CodeMirror) into their own chunks so they can be
+        // cached independently between sessions and aren't duplicated across
+        // lazy-loaded routes. The rest is left to Vite/Rolldown's default
+        // chunking, which keeps the initial bundle small.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (/[\\/](three|3d-force-graph|three-spritetext)[\\/]/.test(id)) {
+            return 'three';
+          }
+          if (id.includes('@codemirror') || id.includes('@uiw/react-codemirror')) {
+            return 'codemirror';
+          }
+          return undefined;
+        },
+      },
+    },
   },
   test: {
     globals: true,

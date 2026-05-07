@@ -34,7 +34,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useGraph } from '../../context/GraphContext';
-import { useSimulation } from '../../context/SimulationContext';
 import { usePermissions } from '../../context/AuthContext';
 import { apiService } from '../../services/api';
 import LoadingPage from '../common/LoadingPage';
@@ -48,9 +47,8 @@ interface DashboardStats {
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { state: authState } = useAuth();
+  useAuth();
   const { state: graphState, loadGraphs } = useGraph();
-  const { state: simulationState, actions: simulationActions } = useSimulation();
   const { canEdit, user } = usePermissions();
 
   // États locaux
@@ -68,23 +66,20 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const initializeDashboard = async () => {
       try {
-        // Charger les graphiques, sessions et statistiques en parallèle
-        const [graphsResult, sessionsResult, statsResult] = await Promise.allSettled([
+        // Load graphs and stats in parallel. Simulation sessions are no
+        // longer fetched — sims run client-side, the backend has no record.
+        const [, statsResult] = await Promise.allSettled([
           loadGraphs({ limit: 5 }),
-          simulationActions.loadSessions(),
-          apiService.getDashboardStats()
+          apiService.getDashboardStats(),
         ]);
-        
-        // Utiliser les vraies statistiques si disponibles, sinon fallback
+
         if (statsResult.status === 'fulfilled' && statsResult.value.success) {
           setStats(statsResult.value.data);
         } else {
-          // Fallback avec données calculees et sessions
-          const activeSimCount = simulationState.sessions.filter(s => s.status === 'running').length;
           setStats({
             totalGraphs: graphState.graphs.length,
-            activeSimulations: activeSimCount,
-            totalUsers: 1, // Au moins l'utilisateur actuel
+            activeSimulations: 0,
+            totalUsers: 1,
             recentActivity: graphState.graphs.length,
           });
         }
@@ -103,6 +98,7 @@ const Dashboard: React.FC = () => {
     };
 
     initializeDashboard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadGraphs]);
 
   // =====================================

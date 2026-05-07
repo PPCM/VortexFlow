@@ -8,7 +8,7 @@ import { linter, Diagnostic } from '@codemirror/lint';
 // Définition du langage DOT pour CodeMirror
 const dotLanguage = StreamLanguage.define({
   name: 'dot',
-  token: (stream, state) => {
+  token: (stream, _state) => {
     // Mots-clés DOT
     if (stream.match(/\b(digraph|graph|node|edge|subgraph|strict|rankdir|size|ratio|label|shape|style|color|fillcolor|fontcolor|fontsize|fontname|penwidth|arrowhead|arrowtail|dir|weight|constraint|rank|ordering|orientation|splines|concentrate|compound|clusterrank|packmode|pack|sep|esep|nodesep|ranksep|mindist|K|maxiter|start|epsilon|overlap|prism|voro_margin|rotate|dimen|mode|model|mosek|quad|root|scale|bb|viewport|page|pagedir|quantum|nslimit|nslimit1|mclimit|beautify|normalize|center|layers|layer|layersep|outputorder|remap|stylesheet|URL|href|target|tooltip|nojustify|labeljust|labelloc|lhead|ltail|same|min|source|len|group|cluster|LR|RL|TB|BT|filled|solid|dashed|dotted|bold|rounded|diagonals|box|polygon|ellipse|oval|circle|point|egg|triangle|plaintext|diamond|trapezium|parallelogram|house|pentagon|hexagon|septagon|octagon|doublecircle|doubleoctagon|tripleoctagon|invtriangle|invtrapezium|invhouse|Mdiamond|Msquare|Mcircle|rect|rectangle|square|none|normal|inv|dot|invdot|odot|invodot|tee|empty|invempty|diamond|odiamond|ediamond|crow|box|obox|open|halfopen|vee)\b/)) {
       return 'keyword';

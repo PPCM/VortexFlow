@@ -289,7 +289,7 @@ export class ErrorHandler {
           // Ignorer les erreurs de logging pour éviter les boucles infinies
         });
       }
-    } catch (logError) {
+    } catch {
       // Ignorer les erreurs de logging
     }
   }
