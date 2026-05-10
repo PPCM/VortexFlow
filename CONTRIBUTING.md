@@ -250,4 +250,4 @@ See [`SECURITY.md`](./SECURITY.md). In short:
 | Backend topic guides | [`backend/doc/`](./backend/doc/) |
 | DOT 3D specification | [`doc/dot-3d/`](./doc/dot-3d/) |
 | Day-by-day changelog | [`doc/changelog/`](./doc/changelog/) |
-| Architecture decisions | `doc/adr/` *(planned, chantier 2.3)* |
+| Architecture decisions | [`doc/adr/`](./doc/adr/) |

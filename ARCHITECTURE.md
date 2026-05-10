@@ -393,4 +393,4 @@ its checklist; do not duplicate the spec here.
 | Day-by-day changelog | [`doc/changelog/`](./doc/changelog/) |
 | Coding conventions | `doc/STYLE_GUIDE.md` *(planned, chantier 2.2)* |
 | Architecture decisions | `doc/adr/` *(planned, chantier 2.3)* |
-| Contribution workflow | `CONTRIBUTING.md` *(planned, chantier 2.1)* |
+| Contribution workflow | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |

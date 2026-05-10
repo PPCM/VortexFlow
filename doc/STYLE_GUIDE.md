@@ -303,5 +303,5 @@ from the requires.
 - Architecture overview → [`/ARCHITECTURE.md`](../ARCHITECTURE.md)
 - Backend topic guides → [`/backend/doc/`](../backend/doc/)
 - DOT 3D specification → [`/doc/dot-3d/`](./dot-3d/)
-- Architecture decisions → `doc/adr/` *(planned, chantier 2.3)*
-- Contribution workflow → `CONTRIBUTING.md` *(planned, chantier 2.1)*
+- Architecture decisions → [`doc/adr/`](./adr/)
+- Contribution workflow → [`/CONTRIBUTING.md`](../CONTRIBUTING.md)
