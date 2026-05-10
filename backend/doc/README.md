@@ -1,66 +1,98 @@
-# 📚 VortexFlow Backend Documentation
+# VortexFlow Backend — Documentation Index
 
-**Version:** 1.0.0  
-**Date:** 2025-07-07  
-**Status:** ✅ Production Ready + Redis Opérationnel
+Backend-specific reference docs. For the project-wide picture (frontend +
+backend + data model + simulation pipeline + DOT 3D invariant), start with
+[`/ARCHITECTURE.md`](../../ARCHITECTURE.md) at the repo root.
 
-## 📋 Index de la Documentation
+## Topic guides
 
-### 🎯 Rapports de Validation
-- **[📊 FINAL_VALIDATION_REPORT](./FINAL_VALIDATION_REPORT.md)** - Rapport complet de validation finale du backend
-- **[🔧 TEST_REPORT](./TEST_REPORT.md)** - Résultats détaillés des tests automatisés
-- **[🔍 REDIS_INTEGRATION_REPORT](./REDIS_INTEGRATION_REPORT.md)** - Intégration et validation Redis complète
+| Doc | Scope |
+|---|---|
+| [`API_DOCUMENTATION.md`](./API_DOCUMENTATION.md) | Full REST API reference: endpoints, payloads, status codes |
+| [`AUTHENTICATION.md`](./AUTHENTICATION.md) | Session lifecycle, roles, `validateSession` middleware |
+| [`CONFIGURATION.md`](./CONFIGURATION.md) | Environment variables, defaults, production checklist |
+| [`DEPLOYMENT.md`](./DEPLOYMENT.md) | Production deployment notes (currently being merged with `/doc/DEPLOYMENT.md` at the repo root) |
+| [`DEVELOPMENT.md`](./DEVELOPMENT.md) | Local dev setup, code layout, common tasks |
 
-### 🛠️ Guides Techniques
-- **[🔐 AUTHENTICATION](./AUTHENTICATION.md)** - Guide d'authentification et gestion des sessions
-- **[📖 TOOLKIT_SUMMARY](./TOOLKIT_SUMMARY.md)** - Boîte à outils complète avec scripts et commandes
-- **[🚀 API_DOCUMENTATION](./API_DOCUMENTATION.md)** - Documentation complète de l'API REST
+## Stack at a glance
 
-### 🏗️ Architecture et Déploiement
-- **[🐳 DEPLOYMENT](./DEPLOYMENT.md)** - Guide de déploiement et configuration production
-- **[⚙️ CONFIGURATION](./CONFIGURATION.md)** - Variables d'environnement et configuration détaillée
-- **[🔄 DEVELOPMENT](./DEVELOPMENT.md)** - Guide de développement et contribution
+| Layer | Choice |
+|---|---|
+| Runtime | Node 18+ (CommonJS) |
+| HTTP | Express + Helmet + CORS + compression + morgan + express-rate-limit |
+| Sessions | `express-session` backed by Redis via `connect-redis` (no JWT) |
+| Persistence | PostgreSQL via Sequelize (associations centralized in `src/models/index.js`) |
+| Realtime | Socket.IO — currently for graph-collab events (cursor / chat / graph-update). The earlier server-side simulation handler was removed in commit `542db32`; simulation now runs entirely in the browser. |
+| Logging | Winston (`src/utils/logger.js`) — use it instead of `console.*` |
+| Validation | `joi` and `express-validator` |
+| File uploads | `multer` → `backend/uploads/`, served at `/uploads` |
 
-## 🎯 Liens Rapides
+## Routes (mount summary)
 
-### 🚀 Démarrage Rapide
+| Mount | Auth |
+|---|---|
+| `/api/auth` | public |
+| `/api/public` | public |
+| `/api/system/health` | public *(special-cased before the protected `/api/system` mount)* |
+| `/api/graphs` | mixed (per-route `validateSession`) |
+| `/api/users` | `validateSession` (admin-only inside) |
+| `/api/dashboard` | `validateSession` |
+| `/api/admin` | own role checks |
+| `/api/system/*` | `validateSession` |
+| `/api/import-export` | `validateSession` |
+
+See [`API_DOCUMENTATION.md`](./API_DOCUMENTATION.md) for the per-endpoint details.
+
+## Quickstart
+
 ```bash
-# Scripts disponibles à la racine du backend
-./start-validated.sh      # Démarrage avec validation complète
-./run-final-tests.sh      # Suite de tests automatisés
-./validate-redis.sh       # Validation Redis spécifique
+cd backend
+cp .env.example .env          # then edit values
+npm install
+npm run check-db              # verify Postgres connectivity
+npm run setup-db              # create admin user, sync models
+npm run dev                   # nodemon server.js
 ```
 
-### 📡 Endpoints Principaux
-- **Health Check:** `GET /api/public/health`
-- **Authentification:** `POST /api/auth/login`
-- **Profil Utilisateur:** `GET /api/users/profile`
-- **Graphiques:** `GET /api/graphs`
+Health probe: `GET /api/system/health` (public) or `GET /api/health` (public).
 
-### 🔑 Accès Admin par Défaut
-- **Email:** `admin@admin.com`
-- **Mot de passe:** `VortexFlow2024!`
+For the full local setup and contribution workflow, see
+[`DEVELOPMENT.md`](./DEVELOPMENT.md).
 
-## 📊 Status des Composants
+## Configuration
 
-| Composant | Status | Version | Notes |
-|-----------|--------|---------|-------|
-| **Node.js Backend** | ✅ Opérationnel | v22.16.0 | Express + middleware complets |
-| **PostgreSQL** | ✅ Opérationnel | - | Base de données principale |
-| **Redis** | ✅ Opérationnel | 6+ | Sessions + cache |
-| **API REST** | ✅ Opérationnel | 40+ endpoints | Tous testés et validés |
-| **WebSocket** | ✅ Opérationnel | Socket.IO | Temps réel configuré |
-| **Tests** | ✅ Validés | 8/8 réussis | Suite automatisée |
+The seeded admin user is bootstrapped from `ADMIN_EMAIL` and `ADMIN_PASSWORD`
+on first startup. Both default values in `.env.example` are placeholders and
+**must not be used in production** — they're documented and public. See
+[`CONFIGURATION.md`](./CONFIGURATION.md) for the full list of environment
+variables and their defaults.
 
-## 🎯 Prochaines Étapes
+## Tests
 
-1. **🎨 Frontend React + Three.js** - Interface de visualisation 3D
-2. **🐳 Containerisation Docker** - Configuration production
-3. **☁️ Déploiement Cloud** - Mise en production
-4. **📊 Monitoring Avancé** - Métriques et alertes
+| Command | Scope |
+|---|---|
+| `npm test` | All Jest suites |
+| `npm run test:unit` | `tests/unit/**` only |
+| `npm run test:integration` | `tests/integration/**` only |
+| `npm run test:coverage` | Adds `--coverage` |
+| `npm test -- path/to/file.test.js` | Single test file |
 
----
+`tests/setup.js` is auto-loaded via `setupFilesAfterEnv` and silences the
+Winston logger globally — put cross-suite mocks there.
 
-**📋 Tous les documents sont maintenus à jour et reflètent l'état actuel du système.**
+When testing modules that install module-level timers (e.g. `utils/fileUpload.js`
+has a 1h `setInterval`), call `jest.useFakeTimers()` before `require` to avoid
+keeping the event loop alive after tests finish.
 
-*Documentation générée automatiquement - VortexFlow Backend v1.0.0*
+## Lint
+
+```bash
+npm run lint        # eslint . --ext .js (eslint:recommended only)
+npm run lint:fix
+```
+
+The backend ESLint config is intentionally minimal (`.eslintrc.json` extends
+`eslint:recommended`). The `eslint-config-airbnb-base` package is installed
+in `devDependencies` but **not wired up** — reactivating it would surface
+hundreds of stylistic violations. A migration to a stricter preset is
+planned.
