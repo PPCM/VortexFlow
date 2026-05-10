@@ -7,6 +7,12 @@
 CLAUDE.md
 CLAUDE.local.md
 
+# Ruflo / claude-flow runtime (par projet, généré par `ruflo init`)
+.claude/
+.claude-flow/
+.swarm/
+.mcp.json
+
 # =====================================
 # Logs et sorties de processus
 # =====================================
