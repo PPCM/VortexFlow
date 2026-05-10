@@ -28,7 +28,7 @@ cp backend/.env.example backend/.env              # backend (DB, Redis, session)
 
 | Tool | Version | Notes |
 |---|---|---|
-| **Node.js** | **24.x** *(target)* | The CI currently runs on Node 20 and `backend/package.json` declares `engines.node >= 18`. A bump of CI + engines to Node 24 is on the roadmap. Use Node 24 locally — the app is expected to evolve to it. |
+| **Node.js** | **24.x** | CI runs Node 24 (`actions/setup-node@v5`). Backend `engines.node` requires `>=24.0.0`. Use Node 24 locally. |
 | PostgreSQL | 14+ | Backing store. Local install or Docker. |
 | Redis | 6+ | Session store and (potentially) cache. |
 | Docker / Docker Compose | optional | Quickest path to a local stack via the root `docker-compose.yml`. |
@@ -46,20 +46,16 @@ cd VortexFlow
 # 2. Environment files (none of them are committed)
 cp .env.example .env                          # root — used by docker-compose
 cp backend/.env.example backend/.env          # backend — DB, Redis, sessions
+cp frontend/.env.example frontend/.env        # frontend — VITE_API_URL, VITE_WS_URL
 
-# 3. Frontend env
-#    There is no frontend/.env.example today. Minimum content for local dev:
-#       VITE_API_URL=http://localhost:5000/api
-#       VITE_WS_URL=http://localhost:5000
-
-# 4. Install dependencies
+# 3. Install dependencies
 cd backend && npm install && cd ..
 cd frontend && npm install --legacy-peer-deps && cd ..
 #                          ^^^^^^^^^^^^^^^^^^^
 #  React 19 isn't yet listed as a peer of every MUI / testing-library version.
 #  Don't drop the flag without checking that npm install succeeds without it.
 
-# 5. Database
+# 4. Database
 cd backend && npm run setup-db                # creates schema + seeded admin
 ```
 
@@ -230,22 +226,18 @@ maintainer.
 
 ## 10. Security disclosures
 
-There is **no `SECURITY.md`** yet. If you find a vulnerability:
+See [`SECURITY.md`](./SECURITY.md). In short:
 
-- **Don't** open a public issue or PR.
-- Email the maintainer (Git author email: `pierre@redtrash.fr`) with details.
-- Allow reasonable time for a fix before public disclosure.
-
-A formal security policy will be added; this section will then point at it.
+- **Don't** open a public issue or PR for vulnerabilities.
+- Email the maintainer at `pierre@redtrash.fr` with the commit hash, impact,
+  and reproduction steps.
+- Acknowledgement target: 7 days; fix or mitigation plan: 30 days.
 
 ---
 
 ## 11. License
 
-The repo currently has **no `LICENSE` file**, despite the `README.md` stating
-"MIT". Until a `LICENSE` is committed, treat the source as **all rights
-reserved** by default — open an issue if you need clarification before
-reusing material.
+[MIT](./LICENSE).
 
 ---
 
