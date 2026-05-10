@@ -90,8 +90,10 @@ export class DotTo3DConverter {
   static async parseDotToGraphData(dotContent: string): Promise<{ nodes: ForceGraphNode[], links: ForceGraphLink[], globalSettings?: any }> {
     // Utiliser le backend pour le parsing robuste
     try {
-      const apiUrl = 'http://192.168.5.30:5000/api/public/parse-dot';
-      console.log(`🔍 Calling backend API: ${apiUrl}`);
+      // Same env contract as services/api.ts so dev / prod / LAN deployments
+      // resolve the same backend without hardcoding any host here.
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const apiUrl = `${apiBase}/public/parse-dot`;
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
