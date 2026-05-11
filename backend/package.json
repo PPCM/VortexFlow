@@ -87,14 +87,15 @@
       "src/**/*.js",
       "!src/config/**",
       "!src/migrations/**",
-      "!src/seeders/**"
+      "!src/seeders/**",
+      "!src/utils/logger.js"
     ],
     "coverageThreshold": {
       "global": {
-        "lines": 60,
-        "branches": 50,
-        "functions": 55,
-        "statements": 60
+        "lines": 75,
+        "branches": 65,
+        "functions": 75,
+        "statements": 75
       },
       "./src/middleware/errorHandler.js": {
         "lines": 90,
@@ -103,6 +104,10 @@
       "./src/utils/dotValidator.js": {
         "lines": 80,
         "branches": 75
+      },
+      "./src/utils/setup.js": {
+        "lines": 85,
+        "branches": 85
       },
       "./src/services/emailService.js": {
         "lines": 85,
