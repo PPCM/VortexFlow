@@ -240,39 +240,6 @@ describe('GraphRenderer3D — Émission particules (one-shot trace)', () => {
 });
 
 // ----------------------------------------------------------------------------
-// Toolbar / panel sync
-// ----------------------------------------------------------------------------
-describe('GraphRenderer3D — Start Simulation button delegates to onToggleSimulation', () => {
-  test('clicking Start Simulation in the rail calls the parent toggle', async () => {
-    const onToggle = vi.fn();
-    render(
-      <GraphRenderer3D
-        dotContent={DOT}
-        isValid
-        isSimulationRunning={false}
-        onToggleSimulation={onToggle}
-      />,
-    );
-    await advancePastInit();
-
-    const btn = screen.getByLabelText(/Start Simulation/i);
-    fireEvent.click(btn);
-
-    expect(onToggle).toHaveBeenCalledTimes(1);
-  });
-
-  test('falls back to a local toggle if no parent callback is provided', async () => {
-    render(<GraphRenderer3D dotContent={DOT} isValid isSimulationRunning={false} />);
-    await advancePastInit();
-
-    const btn = screen.getByLabelText(/Start Simulation/i);
-    fireEvent.click(btn);
-    // Local fallback flips the flag → label should switch to "Pause Simulation".
-    await screen.findByLabelText(/Pause Simulation/i);
-  });
-});
-
-// ----------------------------------------------------------------------------
 // Cleanup
 // ----------------------------------------------------------------------------
 describe('GraphRenderer3D — cleanup on unmount', () => {

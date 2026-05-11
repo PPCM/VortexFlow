@@ -19,8 +19,6 @@ import {
   Label as LabelIcon,
   TextFields as TextFieldsIcon,
   FlashOn as FlashOnIcon,
-  PlayArrow as PlayArrowIcon,
-  Pause as PauseIcon,
   Tune as TuneIcon,
 } from '@mui/icons-material';
 import ForceGraph3D from '3d-force-graph';
@@ -45,10 +43,6 @@ interface GraphRenderer3DProps {
   // Drives the in-renderer simulation: when true, particles emit along links
   // and the per-node accumulation / stats effect runs.
   isSimulationRunning?: boolean;
-  // Optional toggle handler: when provided, the panel's Start/Pause button
-  // delegates to the parent (GraphViewer) instead of flipping a local flag,
-  // so the toolbar icon and the panel button stay in sync.
-  onToggleSimulation?: () => void;
 }
 
 // Types pour la gestion des données 3D étendues
@@ -510,7 +504,6 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   isValid,
   parsedData: _parsedData,
   isSimulationRunning,
-  onToggleSimulation,
 }) => {
   const graphRef = useRef<HTMLDivElement>(null);
   const forceGraphRef = useRef<any>(null);
