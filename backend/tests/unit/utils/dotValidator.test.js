@@ -375,4 +375,121 @@ describe('dotValidator', () => {
       expect(r.metadata.hasVortexFlowExtensions).toBe(false);
     });
   });
+
+  // ----- DES attributes: nodeRole, dropPolicy (ADR-006) -----
+  describe('DES attributes (ADR-006)', () => {
+    describe('nodeRole', () => {
+      test.each(['generator', 'relay', 'sink'])('accepts nodeRole="%s"', async (role) => {
+        const dot = `digraph G { A [nodeRole="${role}"] B A -> B }`;
+        const r = await validator.validate(dot);
+        expect(r.valid).toBe(true);
+        expect(r.warnings.some((w) => /Invalid nodeRole/.test(w))).toBe(false);
+      });
+
+      test('warns on unknown nodeRole', async () => {
+        const dot = 'digraph G { A [nodeRole="emitter"] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(r.warnings.some((w) => /Invalid nodeRole.*emitter/.test(w))).toBe(true);
+      });
+
+      test('marks the graph as having extensions', async () => {
+        const dot = 'digraph G { A [nodeRole="generator"] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(r.metadata.hasVortexFlowExtensions).toBe(true);
+      });
+    });
+
+    describe('dropPolicy', () => {
+      test.each(['tail', 'head', 'reject'])('accepts dropPolicy="%s"', async (policy) => {
+        const dot = `digraph G { A [queue_size=10, dropPolicy="${policy}"] B A -> B }`;
+        const r = await validator.validate(dot);
+        expect(r.valid).toBe(true);
+        expect(r.warnings.some((w) => /Invalid dropPolicy/.test(w))).toBe(false);
+      });
+
+      test('warns on unknown dropPolicy', async () => {
+        const dot = 'digraph G { A [queue_size=10, dropPolicy="random"] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(r.warnings.some((w) => /Invalid dropPolicy.*random/.test(w))).toBe(true);
+      });
+
+      test('marks the graph as having extensions', async () => {
+        const dot = 'digraph G { A [queue_size=5, dropPolicy="tail"] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(r.metadata.hasVortexFlowExtensions).toBe(true);
+      });
+    });
+
+    describe('coherence warnings', () => {
+      test('warns when dropPolicy is set without queue_size', async () => {
+        const dot = 'digraph G { A [dropPolicy="tail"] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(
+          r.warnings.some((w) => /dropPolicy.*no effect.*queue_size/.test(w))
+        ).toBe(true);
+      });
+
+      test('does not warn when dropPolicy is set with queue_size', async () => {
+        const dot = 'digraph G { A [queue_size=10, dropPolicy="tail"] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(
+          r.warnings.some((w) => /dropPolicy.*no effect.*queue_size/.test(w))
+        ).toBe(false);
+      });
+
+      test('warns when particleGeneration > 0 on a relay node', async () => {
+        const dot = 'digraph G { A [nodeRole="relay", particleGeneration=5] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(
+          r.warnings.some((w) => /particleGeneration.*ignored.*nodeRole="relay"/.test(w))
+        ).toBe(true);
+      });
+
+      test('warns when particleGeneration > 0 on a sink node', async () => {
+        const dot = 'digraph G { A [nodeRole="sink", particleGeneration=5] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(
+          r.warnings.some((w) => /particleGeneration.*ignored.*nodeRole="sink"/.test(w))
+        ).toBe(true);
+      });
+
+      test('does not warn when particleGeneration > 0 on a generator node', async () => {
+        const dot = 'digraph G { A [nodeRole="generator", particleGeneration=5] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(
+          r.warnings.some((w) => /particleGeneration.*ignored/.test(w))
+        ).toBe(false);
+      });
+
+      test('does not warn when particleGeneration=0 on a relay node', async () => {
+        const dot = 'digraph G { A [nodeRole="relay", particleGeneration=0] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(
+          r.warnings.some((w) => /particleGeneration.*ignored/.test(w))
+        ).toBe(false);
+      });
+
+      test('does not warn when only nodeRole is set with no particleGeneration', async () => {
+        const dot = 'digraph G { A [nodeRole="relay"] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(
+          r.warnings.some((w) => /particleGeneration.*ignored/.test(w))
+        ).toBe(false);
+      });
+    });
+
+    describe('existing simulation attributes still validate as before', () => {
+      test('failure_rate outside [0, 1] still warns', async () => {
+        const dot = 'digraph G { A [failure_rate=1.5] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(r.warnings.some((w) => /Invalid failure_rate/.test(w))).toBe(true);
+      });
+
+      test('queue_size negative still warns', async () => {
+        const dot = 'digraph G { A [queue_size=-5] B A -> B }';
+        const r = await validator.validate(dot);
+        expect(r.warnings.some((w) => /Invalid queue_size/.test(w))).toBe(true);
+      });
+    });
+  });
 });
