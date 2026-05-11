@@ -89,6 +89,46 @@
       "!src/migrations/**",
       "!src/seeders/**"
     ],
+    "coverageThreshold": {
+      "global": {
+        "lines": 60,
+        "branches": 50,
+        "functions": 55,
+        "statements": 60
+      },
+      "./src/middleware/errorHandler.js": {
+        "lines": 90,
+        "branches": 80
+      },
+      "./src/utils/dotValidator.js": {
+        "lines": 80,
+        "branches": 75
+      },
+      "./src/services/emailService.js": {
+        "lines": 85,
+        "branches": 75
+      },
+      "./src/models/GraphShare.js": {
+        "lines": 90,
+        "branches": 75
+      },
+      "./src/models/GraphVersion.js": {
+        "lines": 90,
+        "branches": 65
+      },
+      "./src/models/SimulationSession.js": {
+        "lines": 90,
+        "branches": 55
+      },
+      "./src/routes/auth.js": {
+        "lines": 90,
+        "branches": 80
+      },
+      "./src/routes/dashboard.js": {
+        "lines": 90,
+        "branches": 75
+      }
+    },
     "verbose": true
   }
 }

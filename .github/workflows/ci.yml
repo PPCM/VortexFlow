@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend:
-    name: Backend (lint + test)
+    name: Backend (lint + test + coverage)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,7 +22,7 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: npm test -- --ci --runInBand --silent
+      - run: npm run test:coverage -- --ci --runInBand --silent
 
   frontend:
     name: Frontend (lint + typecheck + test + build)
@@ -40,5 +40,5 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm run lint
       - run: npx tsc --noEmit
-      - run: npm test -- --reporter=dot
+      - run: npm run test:coverage -- --reporter=dot
       - run: npm run build

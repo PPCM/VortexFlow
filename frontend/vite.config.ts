@@ -53,5 +53,16 @@ export default defineConfig({
     alias: {
       'monaco-editor': new URL('./src/test-stubs/empty.ts', import.meta.url).pathname,
     },
+    coverage: {
+      // Baseline matching the current numbers. Raise these as new tests land
+      // for the under-covered modules (AdminPanel, GraphList, api, websocket).
+      // Per-module thresholds aren't worth the noise yet — track via reports.
+      thresholds: {
+        lines: 60,
+        branches: 55,
+        functions: 50,
+        statements: 60,
+      },
+    },
   },
 });
