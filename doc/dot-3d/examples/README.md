@@ -4,8 +4,26 @@ Cette collection d'exemples démontre les capacités avancées de l'extension DO
 
 ## 📋 Liste des Exemples
 
+### 0. 🎯 [Rôles `nodeRole`](./generators.dot) _(DES — ADR-006)_
+
+**Cas d'usage** : démonstration minimale des trois rôles (`generator`, `relay`, `sink`).
+
+- **Topologie** : 2 sources convergent vers 1 routeur vers 1 puits.
+- **Pas de saturation** — le routeur a la capacité de tout traiter.
+- **À utiliser pour** : comprendre l'effet de `nodeRole` avant de plonger dans des cas plus riches.
+
+### 0.bis. 🚨 [Goulot avec drop](./saturation.dot) _(DES — ADR-006)_
+
+**Cas d'usage** : démonstration de l'accumulation, du halo de saturation et des drops visibles.
+
+- **Topologie** : 1 source rapide → 1 goulot étroit → 1 puits.
+- **Comportement** : la file du goulot se remplit, halo orange à 80 %, drops dès saturation, flash rouge à chaque drop.
+- **À utiliser pour** : valider les phases 5 (visu) et 7 (test d'intégration "saturation") du chantier DES.
+
 ### 1. 🌐 [Réseau de Distribution](./network-distribution.dot)
+
 **Cas d'usage** : Infrastructure réseau avec flux de données
+
 - **Domaine** : Télécommunications, Cloud Computing
 - **Géométries** : Box (datacenters), Cylinder (serveurs régionaux), Cone (edge), Torus (CDN), Sphere (utilisateurs)
 - **Particules** : Représentent les requêtes et données transitant
@@ -13,13 +31,16 @@ Cette collection d'exemples démontre les capacités avancées de l'extension DO
 - **Vitesses** : Variables selon la géographie (backbone transpacifique plus lent)
 
 **Points d'intérêt** :
+
 - Accumulation visible aux goulots d'étranglement
 - Différentes vitesses selon la latence géographique
 - Flux bidirectionnel avec analytics de retour
 - CDN optimisé pour haute performance
 
 ### 2. ⚛️ [Physique des Particules](./particle-physics.dot)
+
 **Cas d'usage** : Accélérateur de particules et détection
+
 - **Domaine** : Recherche scientifique, Physique
 - **Géométries** : Sphere (sources), Cylinder (accélérateurs), Torus (cyclotrons), Box (détecteurs)
 - **Particules** : Protons, électrons et particules secondaires
@@ -27,13 +48,16 @@ Cette collection d'exemples démontre les capacités avancées de l'extension DO
 - **Vitesses** : Accélération progressive, très haute énergie avant collision
 
 **Points d'intérêt** :
+
 - Génération de particules secondaires après collision
 - Pertes par rayonnement dans les cyclotrons
 - Détection multi-canal parallèle
 - Boucles de rétroaction pour calibration
 
 ### 3. 🔄 [Pipeline de Workflow](./workflow-pipeline.dot)
+
 **Cas d'usage** : CI/CD avec goulots d'étranglement
+
 - **Domaine** : DevOps, Développement logiciel
 - **Géométries** : Box (repos, compilation), Cone (tests), Cylinder (intégration), Torus (sécurité)
 - **Particules** : Commits, builds, et artefacts
@@ -41,13 +65,16 @@ Cette collection d'exemples démontre les capacités avancées de l'extension DO
 - **Vitesses** : Hotfix rapides, déploiement production contrôlé
 
 **Points d'intérêt** :
+
 - Parallélisation des tests après compilation
 - Synchronisation avant packaging Docker
 - Chemin hotfix contournant certaines étapes
 - Feedback d'erreurs vers développement
 
 ### 4. 📱 [Réseau Social](./social-network.dot)
+
 **Cas d'usage** : Propagation virale de contenu
+
 - **Domaine** : Réseaux sociaux, Marketing viral
 - **Géométries** : Sphere (influenceurs, audience), Cylinder (comptes), Torus (communautés), Box (algorithmes)
 - **Particules** : Posts, shares, engagements
@@ -55,13 +82,16 @@ Cette collection d'exemples démontre les capacités avancées de l'extension DO
 - **Vitesses** : Contenu lifestyle plus viral que tech
 
 **Points d'intérêt** :
+
 - Amplification algorithmique automatique
 - Croisements entre communautés thématiques
 - Boucles de rétroaction d'engagement
 - Système de tendances détectant la viralité
 
 ### 5. 💰 [Système Économique](./economic-system.dot)
+
 **Cas d'usage** : Flux financiers et monétaires
+
 - **Domaine** : Économie, Finance, Politique monétaire
 - **Géométries** : Sphere (banque centrale, ménages), Cylinder (banques), Box (industries, état), Torus (marchés)
 - **Particules** : Monnaie, crédits, investissements
@@ -69,6 +99,7 @@ Cette collection d'exemples démontre les capacités avancées de l'extension DO
 - **Vitesses** : Transactions rapides vs procédures administratives lentes
 
 **Points d'intérêt** :
+
 - Circuit monétaire complet banque centrale → économie
 - Chaîne de valeur primaire → secondaire → tertiaire
 - Circuit fiscal collecte → redistribution
@@ -77,6 +108,7 @@ Cette collection d'exemples démontre les capacités avancées de l'extension DO
 ## 🎯 Concepts Clés Démontrés
 
 ### **Géométries 3D Avancées**
+
 - **Sphere** : Entités centrales, sources/destinataires
 - **Box** : Infrastructures, centres de traitement
 - **Cylinder** : Relais, serveurs, institutions
@@ -84,12 +116,14 @@ Cette collection d'exemples démontre les capacités avancées de l'extension DO
 - **Torus** : Systèmes circulaires, algorithmes, marchés
 
 ### **Simulation de Particules**
+
 - **Génération** : `particleGeneration` - Production de contenu/flux
 - **Traitement** : `maxParticleProcessing` - Capacité de traitement
 - **Goulots** : Accumulation quand génération > traitement
 - **Vitesses** : `particleSpeed` - Urgence et priorité des flux
 
 ### **Effets Visuels**
+
 - **Auto-resize** : Taille des nœuds selon leur importance
 - **Bloom effect** : Halo lumineux sur les accumulations
 - **Couleurs thématiques** : Codage par secteur/fonction
@@ -98,18 +132,21 @@ Cette collection d'exemples démontre les capacités avancées de l'extension DO
 ## 🚀 Utilisation dans VortexFlow
 
 ### **Chargement des Exemples**
+
 1. Copiez le contenu d'un fichier `.dot`
 2. Collez dans l'éditeur VortexFlow
 3. Cliquez sur "Visualiser en 3D"
 4. Activez la simulation de particules dans le panneau de contrôle
 
 ### **Contrôles Interactifs**
+
 - **Particules** : Activez/désactivez avec le bouton toggle
 - **Vitesse** : Ajustez la vitesse globale de simulation
 - **Bloom** : Intensifiez l'effet lumineux sur les accumulations
 - **Tailles** : Utilisez auto-resize pour voir l'importance relative
 
 ### **Personnalisation**
+
 - **Couleurs** : Modifiez les attributs `color` pour votre thème
 - **Géométries** : Changez `geometry` et `dimensions` selon vos besoins
 - **Flux** : Ajustez `maxParticleFlow` et `particleSpeed` pour votre cas
@@ -118,6 +155,7 @@ Cette collection d'exemples démontre les capacités avancées de l'extension DO
 ## 🔧 Paramètres Recommandés
 
 ### **Pour Démonstrations**
+
 ```dot
 defaultNodeSize = 1.2;
 particlesEnabled = true;
@@ -126,6 +164,7 @@ bloomEffect = true;
 ```
 
 ### **Pour Analyses Détaillées**
+
 ```dot
 defaultNodeSize = 0.8;
 particlesEnabled = true;
@@ -134,6 +173,7 @@ bloomEffect = false; // Moins de distraction
 ```
 
 ### **Pour Présentations**
+
 ```dot
 defaultNodeSize = 1.5;
 particlesEnabled = true;
@@ -155,16 +195,19 @@ Ces exemples permettent de visualiser des métriques importantes :
 ## 🎓 Cas d'Usage Étendus
 
 ### **Infrastructure IT**
+
 - Monitoring réseau avec alertes visuelles
 - Analyse de performance des microservices
 - Visualisation des flux de données en temps réel
 
 ### **Analyse Métier**
+
 - Flux de processus avec identification des goulots
 - Propagation d'information dans l'organisation
 - Modélisation des chaînes d'approvisionnement
 
 ### **Recherche et Éducation**
+
 - Simulation de systèmes complexes
 - Visualisation de modèles théoriques
 - Démonstrations interactives pour l'enseignement

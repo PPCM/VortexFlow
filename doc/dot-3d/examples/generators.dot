@@ -1,0 +1,65 @@
+// generators.dot — Exemple démontrant les trois rôles nodeRole.
+//
+// Topologie :
+//   SourceA  ─┐
+//             ├─→  Router  ─→  Sink
+//   SourceB  ─┘
+//
+// Deux générateurs convergent vers un relay (Router) qui répartit vers
+// un sink (Drain). Le sink absorbe sans rerouter — la particule disparaît
+// à son arrivée.
+//
+// Ce graphe ne sature pas : SourceA + SourceB = 3 p/s entrent dans Router,
+// qui traite 10 p/s. Pas de drop, pas d'accumulation visible.
+// Voir saturation.dot pour le cas inverse.
+
+digraph Generators {
+    // Configuration globale
+    defaultNodeSize = 1.5;
+    particlesEnabled = true;
+    autoColors = false;
+
+    // Deux sources actives
+    SourceA [
+        label="Source A",
+        nodeRole="generator",
+        particleGeneration=2,        // 2 particules/seconde
+        geometry="Cone",
+        color="#ff6666"
+    ];
+
+    SourceB [
+        label="Source B",
+        nodeRole="generator",
+        particleGeneration=1,        // 1 particule/seconde
+        geometry="Cone",
+        color="#ff9966"
+    ];
+
+    // Routeur — reçoit, traite, redistribue
+    Router [
+        label="Routeur central",
+        // nodeRole omis → relay par défaut
+        maxParticleProcessing=10,
+        queue_size=30,
+        dropPolicy="tail",
+        processing_time=2,
+        geometry="Box",
+        dimensions="{width: 2.0, height: 1.5, depth: 1.5}",
+        color="#66cc66"
+    ];
+
+    // Puits — absorbe sans rerouter
+    Sink [
+        label="Drain",
+        nodeRole="sink",
+        geometry="Sphere",
+        dimensions="{radius: 1.2}",
+        color="#666699"
+    ];
+
+    // Connexions
+    SourceA -> Router [maxParticleFlow=5, particleSpeed=1.5, color="#ff6666"];
+    SourceB -> Router [maxParticleFlow=5, particleSpeed=1.5, color="#ff9966"];
+    Router  -> Sink   [maxParticleFlow=15, particleSpeed=1.0, color="#66cc66"];
+}

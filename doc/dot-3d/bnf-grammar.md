@@ -10,9 +10,9 @@ graph ::= ['strict'] ('graph' | 'digraph') [id] '{' stmt_list '}'
 
 stmt_list ::= [stmt [';' | '\n'] stmt_list]
 
-stmt ::= node_stmt 
-       | edge_stmt 
-       | attr_stmt 
+stmt ::= node_stmt
+       | edge_stmt
+       | attr_stmt
        | id '=' id
        | subgraph
        | global_3d_config
@@ -48,8 +48,16 @@ visual_3d_attribute ::= 'geometry' '=' geometry_type
                       | 'dimensions' '=' dimensions_object
                       | 'image' '=' url_string
 
-simulation_attribute ::= 'particleGeneration' '=' number
+simulation_attribute ::= 'nodeRole' '=' node_role
+                       | 'particleGeneration' '=' number
                        | 'maxParticleProcessing' '=' number
+                       | 'queue_size' '=' integer
+                       | 'processing_time' '=' number
+                       | 'failure_rate' '=' number
+                       | 'dropPolicy' '=' drop_policy
+
+node_role ::= '"generator"' | '"relay"' | '"sink"'
+drop_policy ::= '"tail"' | '"head"' | '"reject"'
 
 (* === TYPES GÉOMÉTRIQUES === *)
 geometry_type ::= '"Sphere"' | '"Box"' | '"Cylinder"' | '"Cone"' | '"Torus"'
@@ -59,7 +67,7 @@ dimension_list ::= dimension (',' dimension)*
 
 dimension ::= 'radius' ':' number
             | 'width' ':' number
-            | 'height' ':' number  
+            | 'height' ':' number
             | 'depth' ':' number
             | 'tube' ':' number
             | 'tubularSegments' ':' integer
@@ -110,42 +118,57 @@ attr_stmt ::= ('graph' | 'node' | 'edge') attr_list
 
 ```ebnf
 (* Contraintes à valider après parsing *)
-constraint ::= geometric_constraint 
-             | simulation_constraint 
+constraint ::= geometric_constraint
+             | simulation_constraint
              | performance_constraint
 
-geometric_constraint ::= sphere_constraint 
-                       | box_constraint 
-                       | cylinder_constraint 
-                       | cone_constraint 
+geometric_constraint ::= sphere_constraint
+                       | box_constraint
+                       | cylinder_constraint
+                       | cone_constraint
                        | torus_constraint
 
-sphere_constraint ::= 
-    WHEN geometry="Sphere" 
+sphere_constraint ::=
+    WHEN geometry="Sphere"
     THEN radius > 0
 
-box_constraint ::= 
-    WHEN geometry="Box" 
+box_constraint ::=
+    WHEN geometry="Box"
     THEN width > 0 AND height > 0 AND depth > 0
 
-cylinder_constraint ::= 
-    WHEN geometry="Cylinder" 
+cylinder_constraint ::=
+    WHEN geometry="Cylinder"
     THEN radius > 0 AND height > 0
 
-cone_constraint ::= 
-    WHEN geometry="Cone" 
+cone_constraint ::=
+    WHEN geometry="Cone"
     THEN radius > 0 AND height > 0
 
-torus_constraint ::= 
-    WHEN geometry="Torus" 
+torus_constraint ::=
+    WHEN geometry="Torus"
     THEN tube > 0 AND tubularSegments >= 3 AND radialSegments >= 3
 
-simulation_constraint ::= 
+simulation_constraint ::=
     particleGeneration >= 0 AND
     maxParticleProcessing > 0 AND
     maxParticleFlow > 0 AND
     particleSpeed > 0 AND
-    defaultNodeSize > 0
+    defaultNodeSize > 0 AND
+    queue_size > 0 AND
+    processing_time >= 0 AND
+    failure_rate >= 0 AND failure_rate <= 1
+
+role_constraint ::=
+    nodeRole ∈ {"generator", "relay", "sink"} AND
+    dropPolicy ∈ {"tail", "head", "reject"}
+
+(* Cross-attribute coherence — warnings, not errors *)
+coherence_warning ::=
+    WHEN dropPolicy DEFINED AND queue_size NOT DEFINED
+    THEN warn("dropPolicy is ignored without queue_size")
+
+    WHEN particleGeneration > 0 AND nodeRole IN {"relay", "sink"}
+    THEN warn("particleGeneration is ignored unless nodeRole=generator")
 ```
 
 ## Exemples de Productions
@@ -170,7 +193,7 @@ node_stmt:
 ```
 edge_stmt:
   node_id: "ServerA"
-  edgeop: "->"  
+  edgeop: "->"
   node_id: "ServerB"
   attr_list: [
     edge_3d_attribute: maxParticleFlow=45
@@ -204,14 +227,14 @@ global_3d_config:
 ### Gestion des Conflits
 
 ```ebnf
-conflict_resolution ::= 
+conflict_resolution ::=
     WHEN duplicate_attribute
     THEN use_last_defined
-    
+
     WHEN global_vs_local
     THEN prefer_local
-    
-    WHEN invalid_combination  
+
+    WHEN invalid_combination
     THEN emit_error_with_suggestion
 ```
 

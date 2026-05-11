@@ -1,0 +1,67 @@
+// saturation.dot — Exemple démontrant l'accumulation puis le drop.
+//
+// Topologie :
+//   FastSource ─→ Bottleneck ─→ Sink
+//
+// FastSource génère 10 particules/seconde, mais Bottleneck ne peut en
+// traiter que 2/seconde et sa file ne stocke que 5 particules.
+//
+// Déroulement attendu à l'écran :
+//   1. Les particules arrivent plus vite qu'elles ne sortent.
+//   2. Bottleneck grossit visuellement à mesure que sa file se remplit.
+//   3. À 80 % de remplissage, halo orange.
+//   4. Quand la file est pleine (5/5), nouvelle arrivée → drop : flash
+//      rouge + compteur de drops incrémente.
+//   5. dropPolicy="tail" : c'est la particule entrante qui est jetée
+//      (changer en "head" pour drop la plus ancienne à la place).
+//
+// Utile pour valider la phase 5 (visualisation) et la phase 7 (test
+// d'intégration "saturation").
+
+digraph Saturation {
+    defaultNodeSize = 1.2;
+    particlesEnabled = true;
+    autoColors = false;
+
+    FastSource [
+        label="Source rapide",
+        nodeRole="generator",
+        particleGeneration=10,       // 10 p/s — bien au-dessus de la capacité aval
+        geometry="Cone",
+        dimensions="{radius: 1.0, height: 2.0}",
+        color="#ff4444"
+    ];
+
+    Bottleneck [
+        label="Goulot",
+        nodeRole="relay",
+        maxParticleProcessing=2,     // 2 p/s — capacité limitée
+        queue_size=5,                // File minuscule
+        dropPolicy="tail",           // Drop l'entrante quand pleine
+        processing_time=400,         // 400 ms par particule → renforce le goulot
+        failure_rate=0,              // Pas d'échec aléatoire à la sortie
+        geometry="Cylinder",
+        dimensions="{radius: 1.0, height: 2.0}",
+        color="#ffaa00"
+    ];
+
+    Sink [
+        label="Sortie",
+        nodeRole="sink",
+        geometry="Sphere",
+        dimensions="{radius: 1.0}",
+        color="#4477aa"
+    ];
+
+    FastSource -> Bottleneck [
+        maxParticleFlow=20,
+        particleSpeed=2.0,           // Vitesse rapide → aggrave le goulot
+        color="#ff4444"
+    ];
+
+    Bottleneck -> Sink [
+        maxParticleFlow=10,
+        particleSpeed=1.0,
+        color="#ffaa00"
+    ];
+}
