@@ -314,8 +314,6 @@ bundlesize.json
 # ESLint
 .eslintcache
 
-# Prettier
-.prettierignore
 
 # TypeScript
 *.tsbuildinfo

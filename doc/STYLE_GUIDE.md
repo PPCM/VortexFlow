@@ -11,13 +11,13 @@ tracked, not patterns to follow.
 
 ## 1. Languages
 
-| Surface | Language |
-|---|---|
-| Code comments | English |
-| User-facing strings (UI labels, errors shown to users) | French |
-| Documentation (`*.md`) | English |
-| Commit messages | French (matches the existing log) |
-| Variable names | English |
+| Surface                                                | Language                          |
+| ------------------------------------------------------ | --------------------------------- |
+| Code comments                                          | English                           |
+| User-facing strings (UI labels, errors shown to users) | French                            |
+| Documentation (`*.md`)                                 | English                           |
+| Commit messages                                        | French (matches the existing log) |
+| Variable names                                         | English                           |
 
 Existing code has French comments in places (e.g. older `LoginPage.tsx`).
 Don't bulk-translate; convert opportunistically when you're already touching
@@ -27,16 +27,16 @@ the file. Don't introduce new French comments.
 
 ## 2. File naming — Frontend (`frontend/src/`)
 
-| Layer | Path | Naming | Example |
-|---|---|---|---|
-| React component | `components/<area>/` | `PascalCase.tsx` | `LoginPage.tsx`, `GraphRenderer3D.tsx` |
-| Component test (colocated) | same dir | `PascalCase.test.tsx` | `LoginPage.test.tsx` |
-| Component CSS (colocated) | same dir | `PascalCase.css` | `AdminPanel.css` |
-| React Context | `context/` | `XxxContext.tsx` | `AuthContext.tsx`, `GraphContext.tsx` |
-| Service | `services/` | `camelCase.ts` | `api.ts`, `errorHandler.ts`, `websocket.ts` |
-| Type definitions | `types/index.ts` | one file, named exports | `types/index.ts` |
-| Ambient module declarations | `@types/` | `*.d.ts` | `3d-force-graph.d.ts` |
-| Test stubs | `test-stubs/` | `camelCase.ts` | `empty.ts` |
+| Layer                       | Path                 | Naming                  | Example                                     |
+| --------------------------- | -------------------- | ----------------------- | ------------------------------------------- |
+| React component             | `components/<area>/` | `PascalCase.tsx`        | `LoginPage.tsx`, `GraphRenderer3D.tsx`      |
+| Component test (colocated)  | same dir             | `PascalCase.test.tsx`   | `LoginPage.test.tsx`                        |
+| Component CSS (colocated)   | same dir             | `PascalCase.css`        | `AdminPanel.css`                            |
+| React Context               | `context/`           | `XxxContext.tsx`        | `AuthContext.tsx`, `GraphContext.tsx`       |
+| Service                     | `services/`          | `camelCase.ts`          | `api.ts`, `errorHandler.ts`, `websocket.ts` |
+| Type definitions            | `types/index.ts`     | one file, named exports | `types/index.ts`                            |
+| Ambient module declarations | `@types/`            | `*.d.ts`                | `3d-force-graph.d.ts`                       |
+| Test stubs                  | `test-stubs/`        | `camelCase.ts`          | `empty.ts`                                  |
 
 **Components are organized by feature area** (`auth/`, `graphs/`, `admin/`,
 `dashboard/`, `user/`, `common/`, `layout/`), not by component type. Don't
@@ -54,15 +54,15 @@ isn't context-bound, create `hooks/useXxx.ts`.
 
 ## 3. File naming — Backend (`backend/src/`)
 
-| Layer | Path | Naming | Example |
-|---|---|---|---|
-| Express route module | `routes/` | `kebab-case.js` (lowercase, hyphens for compounds) | `auth.js`, `import-export.js` |
-| Sequelize model | `models/` | `PascalCase.js` (matches the model name) | `User.js`, `GraphShare.js` |
-| Models barrel | `models/index.js` | the **only** place that wires associations | |
-| Middleware | `middleware/` | `camelCase.js` | `asyncHandler.js`, `errorHandler.js`, `auth.js` |
-| Utility | `utils/` | `camelCase.js` | `dotValidator.js`, `fileUpload.js`, `logger.js` |
-| Service | `services/` | `camelCase.js` | `emailService.js` |
-| Sequelize config | `config/` | one file per concern | `database.js` |
+| Layer                | Path              | Naming                                             | Example                                         |
+| -------------------- | ----------------- | -------------------------------------------------- | ----------------------------------------------- |
+| Express route module | `routes/`         | `kebab-case.js` (lowercase, hyphens for compounds) | `auth.js`, `import-export.js`                   |
+| Sequelize model      | `models/`         | `PascalCase.js` (matches the model name)           | `User.js`, `GraphShare.js`                      |
+| Models barrel        | `models/index.js` | the **only** place that wires associations         |                                                 |
+| Middleware           | `middleware/`     | `camelCase.js`                                     | `asyncHandler.js`, `errorHandler.js`, `auth.js` |
+| Utility              | `utils/`          | `camelCase.js`                                     | `dotValidator.js`, `fileUpload.js`, `logger.js` |
+| Service              | `services/`       | `camelCase.js`                                     | `emailService.js`                               |
+| Sequelize config     | `config/`         | one file per concern                               | `database.js`                                   |
 
 Tests live **outside** `src/`, mirrored by layer:
 
@@ -82,16 +82,16 @@ backend/tests/
 
 ## 4. Identifier naming
 
-| Kind | Style | Example |
-|---|---|---|
-| Variables, function parameters | `camelCase` | `userId`, `dotContent` |
-| Functions | `camelCase` | `validateSession`, `setupAdminUser` |
-| React components, Sequelize models, classes, TS interfaces | `PascalCase` | `GraphRenderer3D`, `User`, `ApiService` |
-| Module-scope constants | `SCREAMING_SNAKE_CASE` | `API_BASE_URL`, `NO_NAV_PATHS`, `DEFAULT_GRAPH_OPTIONS` |
-| Database columns | `snake_case` | `user_id`, `dot_code`, `permission_level`, `start_time` |
-| URL path segments | `kebab-case` | `/api/import-export`, `/validate-dot`, `/parse-dot` |
-| Environment variables | `SCREAMING_SNAKE_CASE` | `SESSION_SECRET`, `VITE_API_URL`, `REDIS_URL` |
-| Vite-exposed env vars | `VITE_*` prefix (mandatory) | `VITE_API_URL`, `VITE_WS_URL` |
+| Kind                                                       | Style                       | Example                                                 |
+| ---------------------------------------------------------- | --------------------------- | ------------------------------------------------------- |
+| Variables, function parameters                             | `camelCase`                 | `userId`, `dotContent`                                  |
+| Functions                                                  | `camelCase`                 | `validateSession`, `setupAdminUser`                     |
+| React components, Sequelize models, classes, TS interfaces | `PascalCase`                | `GraphRenderer3D`, `User`, `ApiService`                 |
+| Module-scope constants                                     | `SCREAMING_SNAKE_CASE`      | `API_BASE_URL`, `NO_NAV_PATHS`, `DEFAULT_GRAPH_OPTIONS` |
+| Database columns                                           | `snake_case`                | `user_id`, `dot_code`, `permission_level`, `start_time` |
+| URL path segments                                          | `kebab-case`                | `/api/import-export`, `/validate-dot`, `/parse-dot`     |
+| Environment variables                                      | `SCREAMING_SNAKE_CASE`      | `SESSION_SECRET`, `VITE_API_URL`, `REDIS_URL`           |
+| Vite-exposed env vars                                      | `VITE_*` prefix (mandatory) | `VITE_API_URL`, `VITE_WS_URL`                           |
 
 **Don't** mirror DB column names into JS variables. Sequelize already maps
 `user_id` ↔ `userId` via model attributes; use the camelCase form
@@ -261,13 +261,14 @@ from the requires.
 
 ## 11. Lint & format
 
-| Tool | Status |
-|---|---|
-| Frontend ESLint (`eslint.config.js`, ESLint 9 flat config) | Wired, repo lint-clean. Keep it that way — CI will fail otherwise. |
-| Backend ESLint (`.eslintrc.json`, `eslint:recommended` only) | Minimal. Migration to a stricter preset is planned. |
-| Prettier | **Not yet wired up.** Don't introduce a personal Prettier config. |
-| `.editorconfig` | **Absent.** Indentation in the codebase is 2 spaces — match it. |
-| `unused-vars` (frontend) | `@typescript-eslint/no-unused-vars` ignores caught errors named `_`, `err`, `error` — keep error bindings even when unused, for stack traces. |
+| Tool                                                         | Status                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend ESLint (`eslint.config.js`, ESLint 9 flat config)   | Wired, repo lint-clean. Keep it that way — CI will fail otherwise.                                                                                                                                                                                |
+| Backend ESLint (`.eslintrc.json`, `eslint:recommended` only) | Minimal. Migration to a stricter preset is planned.                                                                                                                                                                                               |
+| Prettier                                                     | Wired at the repo root (`.prettierrc.json`). Runs on commit via lint-staged for `*.{json,md,yml,yaml}`. Source files are **not** Prettier-reformatted in bulk (see `.prettierignore`) — ESLint handles them on save / on commit.                  |
+| `.editorconfig`                                              | Present at the repo root. 2-space indent, LF line endings, final newline, trim trailing whitespace (except in Markdown).                                                                                                                          |
+| Husky + lint-staged                                          | Pre-commit hook (`.husky/pre-commit`) runs lint-staged: Prettier on config/docs, `npm run lint -- --fix` on the affected sub-package for changed JS/TS files. To bypass in a true emergency: `git commit --no-verify` (don't make a habit of it). |
+| `unused-vars` (frontend)                                     | `@typescript-eslint/no-unused-vars` ignores caught errors named `_`, `err`, `error` — keep error bindings even when unused, for stack traces.                                                                                                     |
 
 **Before committing**, both packages must lint-clean:
 
@@ -286,7 +287,7 @@ from the requires.
   - `<subject>` for repo-wide changes (e.g. `Ignore les artefacts runtime`).
   - First line ≤ ~70 chars. Body wrapped at ~72 if added.
 - **No AI attribution** anywhere: no `Co-Authored-By`, no `Generated with
-  Claude Code`, no `Anthropic` mention in commits, PR descriptions, comments,
+Claude Code`, no `Anthropic` mention in commits, PR descriptions, comments,
   or code.
 - **Branches**: working directly on `main` is current practice for this solo
   repo. If branches are introduced, use `feature/<slug>`, `fix/<slug>`,

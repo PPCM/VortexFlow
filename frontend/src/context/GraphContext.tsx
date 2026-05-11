@@ -374,13 +374,9 @@ export const GraphProvider: React.FC<GraphProviderProps> = ({ children }) => {
     if (!state.currentGraph) return;
 
     try {
-      // TODO: Implement updateSimulationConfig API method
-      // await apiService.updateSimulationConfig(state.currentGraph.id, config);
-      
+      // Simulation runs entirely client-side (ADR-002), so updates to the
+      // simulation config stay local — no API call and no WebSocket emit.
       dispatch({ type: 'UPDATE_SIMULATION_CONFIG', payload: config });
-      
-      // TODO: Check if WebSocket service has updateSimulationConfig method
-      // webSocketService.updateSimulationConfig(state.currentGraph.id, config);
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: apiService.handleApiError(error) });
     }

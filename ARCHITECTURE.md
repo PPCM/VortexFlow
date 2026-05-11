@@ -16,10 +16,10 @@ bandwidth/capacity, etc.) and renders them in the browser using Three.js via
 
 The repo holds **two independent npm packages** (no monorepo tooling):
 
-| Package | Role | Stack |
-|---|---|---|
-| `backend/` | REST API + WebSocket + persistence | Node 18+ (CommonJS), Express, Sequelize/Postgres, `express-session` + `connect-redis`, Socket.IO, Winston |
-| `frontend/` | SPA + 3D rendering | React 19 + TypeScript 5, Vite, Vitest, MUI, Three.js, `3d-force-graph`, Monaco + CodeMirror |
+| Package     | Role                               | Stack                                                                                                     |
+| ----------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `backend/`  | REST API + WebSocket + persistence | Node 18+ (CommonJS), Express, Sequelize/Postgres, `express-session` + `connect-redis`, Socket.IO, Winston |
+| `frontend/` | SPA + 3D rendering                 | React 19 + TypeScript 5, Vite, Vitest, MUI, Three.js, `3d-force-graph`, Monaco + CodeMirror               |
 
 A `scripts/` folder at the repo root provides start/stop/health scripts that
 orchestrate both packages.
@@ -102,17 +102,17 @@ websocket/   Socket.IO handlers for graph-collab
 
 ### Routes
 
-| Mount | File | Auth | Notes |
-|---|---|---|---|
-| `/api/auth` | `routes/auth.js` | public | Login, register, profile |
-| `/api/public` | `routes/public.js` | public | Health, version, public graphs |
-| `/api/graphs` | `routes/graphs.js` | mixed | Per-route `validateSession` for write ops |
-| `/api/users` | `routes/users.js` | `validateSession` | Admin-only checks inside |
-| `/api/dashboard` | `routes/dashboard.js` | `validateSession` | |
-| `/api/admin` | `routes/admin.js` | own role checks | |
-| `/api/system/health` | `routes/system.js` | public | **Special-cased before protected mount** |
-| `/api/system/*` | `routes/system.js` | `validateSession` | |
-| `/api/import-export` | `routes/import-export.js` | `validateSession` | DOT/JSON/ZIP exchange |
+| Mount                | File                      | Auth              | Notes                                     |
+| -------------------- | ------------------------- | ----------------- | ----------------------------------------- |
+| `/api/auth`          | `routes/auth.js`          | public            | Login, register, profile                  |
+| `/api/public`        | `routes/public.js`        | public            | Health, version, public graphs            |
+| `/api/graphs`        | `routes/graphs.js`        | mixed             | Per-route `validateSession` for write ops |
+| `/api/users`         | `routes/users.js`         | `validateSession` | Admin-only checks inside                  |
+| `/api/dashboard`     | `routes/dashboard.js`     | `validateSession` |                                           |
+| `/api/admin`         | `routes/admin.js`         | own role checks   |                                           |
+| `/api/system/health` | `routes/system.js`        | public            | **Special-cased before protected mount**  |
+| `/api/system/*`      | `routes/system.js`        | `validateSession` |                                           |
+| `/api/import-export` | `routes/import-export.js` | `validateSession` | DOT/JSON/ZIP exchange                     |
 
 **When adding a model**, register its associations in `models/index.js`, not
 inside the model file. That's the convention; the file is the single source of
@@ -148,15 +148,15 @@ Defined in `App.tsx`. Auth pages (`/login`, `/register`) stay eagerly loaded
 (small, render before login). The heavy editor / viewer / admin pages are
 **lazy-loaded** via `React.lazy` to keep the initial bundle small:
 
-| Path | Component | Auth | Lazy |
-|---|---|---|---|
-| `/login`, `/register` | `LoginPage`, `RegisterPage` | public-only | no |
-| `/dashboard` | `Dashboard` | required | no |
-| `/graphs` | `GraphList` | required | no |
-| `/graphs/create`, `/graphs/:id/edit` | `GraphEditor` | required | yes |
-| `/graphs/:id/view` | `GraphViewer` | required | yes |
-| `/profile` | `UserProfile` | required | no |
-| `/admin` | `AdminPanel` | admin | yes |
+| Path                                 | Component                   | Auth        | Lazy |
+| ------------------------------------ | --------------------------- | ----------- | ---- |
+| `/login`, `/register`                | `LoginPage`, `RegisterPage` | public-only | no   |
+| `/dashboard`                         | `Dashboard`                 | required    | no   |
+| `/graphs`                            | `GraphList`                 | required    | no   |
+| `/graphs/create`, `/graphs/:id/edit` | `GraphEditor`               | required    | yes  |
+| `/graphs/:id/view`                   | `GraphViewer`               | required    | yes  |
+| `/profile`                           | `UserProfile`               | required    | no   |
+| `/admin`                             | `AdminPanel`                | admin       | yes  |
 
 `NO_NAV_PATHS` (`/login`, `/register`, `/forgot-password`, `/reset-password`)
 hide the left navigation even when a session is still active — covers the case
@@ -164,11 +164,11 @@ of a user manually visiting `/login` to switch accounts.
 
 ### Services
 
-| File | Role |
-|---|---|
-| `services/api.ts` | Axios instance with `withCredentials: true` (session cookies). Error interceptor wired in `App.tsx` via `setupAxiosErrorInterceptor`. |
-| `services/websocket.ts` | `socket.io-client` connection. Currently used for graph-collab events. |
-| `services/errorHandler.ts` | Central API error formatting. |
+| File                       | Role                                                                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `services/api.ts`          | Axios instance with `withCredentials: true` (session cookies). Error interceptor wired in `App.tsx` via `setupAxiosErrorInterceptor`. |
+| `services/websocket.ts`    | `socket.io-client` connection. Currently used for graph-collab events.                                                                |
+| `services/errorHandler.ts` | Central API error formatting.                                                                                                         |
 
 ### 3D rendering pipeline
 
@@ -184,14 +184,14 @@ DOT parsing/validation endpoints exist at **two layers** — `/api/public/*`
 (unauthenticated, used by the renderer today and by the public landing page)
 and `/api/graphs/*` (session-protected, intended for editor flows):
 
-| Route | Auth | Purpose |
-|---|---|---|
-| `POST /api/public/validate-dot` | public | Syntax check |
-| `POST /api/public/parse-dot` | public | Parse to graph structure (called by `GraphRenderer3D`) |
-| `GET /api/public/dot-examples` | public | Built-in samples |
-| `POST /api/graphs/validate-dot` | session | Same as public, available to authenticated editor |
-| `POST /api/graphs/parse-dot` | session | Same as public, available to authenticated editor |
-| `GET /api/graphs/dot-examples` | session | Same as public |
+| Route                           | Auth    | Purpose                                                |
+| ------------------------------- | ------- | ------------------------------------------------------ |
+| `POST /api/public/validate-dot` | public  | Syntax check                                           |
+| `POST /api/public/parse-dot`    | public  | Parse to graph structure (called by `GraphRenderer3D`) |
+| `GET /api/public/dot-examples`  | public  | Built-in samples                                       |
+| `POST /api/graphs/validate-dot` | session | Same as public, available to authenticated editor      |
+| `POST /api/graphs/parse-dot`    | session | Same as public, available to authenticated editor      |
+| `GET /api/graphs/dot-examples`  | session | Same as public                                         |
 
 The duplication is a known piece of debt — the two layers do the same thing
 and the renderer arguably should hit the session-protected one when the user
@@ -200,17 +200,17 @@ is logged in.
 The renderer (`components/graphs/GraphRenderer3D.tsx`) carries several
 non-obvious behaviors that **must be preserved** when touching it
 (auto-zoom timing, particle-material patch, particle-emit one-shot vs
-continuous, stats fallback for plain DOT). See the *load-bearing behaviors*
+continuous, stats fallback for plain DOT). See the _load-bearing behaviors_
 section in the contributing notes (and code comments at the call sites).
 
 ### Vite chunk split
 
 `vite.config.ts` defines a manual chunk split:
 
-| Chunk | Contents | Why |
-|---|---|---|
-| `three` | `three`, `3d-force-graph`, `three-spritetext` | Heavy stack only used in `GraphRenderer3D`, isolated for caching |
-| `codemirror` | `@codemirror/*`, `@uiw/react-codemirror` | Heavy editor stack, isolated for caching |
+| Chunk        | Contents                                      | Why                                                              |
+| ------------ | --------------------------------------------- | ---------------------------------------------------------------- |
+| `three`      | `three`, `3d-force-graph`, `three-spritetext` | Heavy stack only used in `GraphRenderer3D`, isolated for caching |
+| `codemirror` | `@codemirror/*`, `@uiw/react-codemirror`      | Heavy editor stack, isolated for caching                         |
 
 Don't merge them back into the default chunk without a reason.
 
@@ -306,8 +306,8 @@ The simulation animation runs **entirely client-side**:
   computed in `frontend/src/components/graphs/GraphRenderer3D.tsx` using
   `3d-force-graph` directional particles + custom Three.js scene walks.
 - The backend's `routes/simulation.js` and `websocket/simulationHandler.js`
-  were **removed** in commit `542db32` (*Fix tests UUID + supprime l'infra
-  simulation backend dormante*). The `SimulationSession` Sequelize model is
+  were **removed** in commit `542db32` (_Fix tests UUID + supprime l'infra
+  simulation backend dormante_). The `SimulationSession` Sequelize model is
   kept for a possible future feature.
 
 The Socket.IO channel is now used for **graph-collab** events (cursor
@@ -322,20 +322,20 @@ VortexFlow extends standard DOT with attributes for 3D geometries, particle
 flow, and simulation parameters. These extensions live in **three places**,
 each with a distinct role:
 
-| Lieu | Role | File(s) |
-|---|---|---|
-| **Validator** *(the gate)* | Decides which attributes / shapes / geometries are valid | `backend/src/utils/dotValidator.js` |
-| **Renderer** *(the consumer)* | Reads the attributes and turns them into 3D effects | `frontend/src/components/graphs/GraphRenderer3D.tsx` |
-| **Specification** *(the reference)* | Describes the language for users | `doc/dot-3d/` (`grammar-specification.md`, `bnf-grammar.md`, `validation-rules.md`, `user-guide.md`, `examples/*.dot`) |
+| Lieu                                | Role                                                     | File(s)                                                                                                                |
+| ----------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Validator** _(the gate)_          | Decides which attributes / shapes / geometries are valid | `backend/src/utils/dotValidator.js`                                                                                    |
+| **Renderer** _(the consumer)_       | Reads the attributes and turns them into 3D effects      | `frontend/src/components/graphs/GraphRenderer3D.tsx`                                                                   |
+| **Specification** _(the reference)_ | Describes the language for users                         | `doc/dot-3d/` (`grammar-specification.md`, `bnf-grammar.md`, `validation-rules.md`, `user-guide.md`, `examples/*.dot`) |
 
 These three **must stay in sync**. If you add or change an attribute and
 update only one of the three, you create a subtle bug:
 
-| If you forget… | Symptom |
-|---|---|
+| If you forget…    | Symptom                                                                   |
+| ----------------- | ------------------------------------------------------------------------- |
 | the **validator** | The spec advertises an attribute, but the API rejects graphs that use it. |
-| the **renderer** | Validation passes, but the 3D scene ignores the attribute — silent no-op. |
-| the **spec** | The feature exists in code but no user can discover it. |
+| the **renderer**  | Validation passes, but the 3D scene ignores the attribute — silent no-op. |
+| the **spec**      | The feature exists in code but no user can discover it.                   |
 
 ### Currently supported VortexFlow attributes
 
@@ -369,28 +369,28 @@ its checklist; do not duplicate the spec here.
 
 ## 10. Cross-cutting concerns
 
-| Concern | Where | Notes |
-|---|---|---|
-| **Logging** | `backend/src/utils/logger.js` (Winston) | Use it instead of `console.*` in backend code. Morgan is piped into it. |
-| **Error handling** | `backend/src/middleware/errorHandler.js` (`notFoundHandler` + `errorHandler`) | Always last in the middleware chain. Frontend has `ErrorBoundary` + `setupAxiosErrorInterceptor`. |
-| **Rate limiting** | `express-rate-limit` mounted on `/api`. | Default: 100 req / 15 min. Tunable via `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX_REQUESTS`. |
-| **File uploads** | `backend/src/utils/fileUpload.js` (Multer) → `backend/uploads/`, served at `/uploads`. | The module installs a 1h cleanup `setInterval` — use `jest.useFakeTimers()` before requiring it in tests. |
-| **CSP** | Helmet config in `server.js`. Allows `ws:` / `wss:` for the simulation socket. | Tightening is planned. |
-| **CORS** | `cors` middleware. In prod, restricted to `FRONTEND_URL`; in dev, also `localhost:3000` and `127.0.0.1:3000`. | |
+| Concern            | Where                                                                                                         | Notes                                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Logging**        | `backend/src/utils/logger.js` (Winston)                                                                       | Use it instead of `console.*` in backend code. Morgan is piped into it.                                   |
+| **Error handling** | `backend/src/middleware/errorHandler.js` (`notFoundHandler` + `errorHandler`)                                 | Always last in the middleware chain. Frontend has `ErrorBoundary` + `setupAxiosErrorInterceptor`.         |
+| **Rate limiting**  | `express-rate-limit` mounted on `/api`.                                                                       | Default: 100 req / 15 min. Tunable via `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX_REQUESTS`.                |
+| **File uploads**   | `backend/src/utils/fileUpload.js` (Multer) → `backend/uploads/`, served at `/uploads`.                        | The module installs a 1h cleanup `setInterval` — use `jest.useFakeTimers()` before requiring it in tests. |
+| **CSP**            | Helmet config in `server.js`. Allows `ws:` / `wss:` for the simulation socket.                                | Tightening is planned.                                                                                    |
+| **CORS**           | `cors` middleware. In prod, restricted to `FRONTEND_URL`; in dev, also `localhost:3000` and `127.0.0.1:3000`. |                                                                                                           |
 
 ---
 
 ## 11. Pointers
 
-| Topic | Doc |
-|---|---|
-| Build & deploy | [`doc/DEPLOYMENT.md`](./doc/DEPLOYMENT.md) (root) — the older [`backend/doc/DEPLOYMENT.md`](./backend/doc/DEPLOYMENT.md) is being deduplicated |
-| Environment & configuration | [`doc/SETUP_ENV_GUIDE.md`](./doc/SETUP_ENV_GUIDE.md) + [`backend/doc/CONFIGURATION.md`](./backend/doc/CONFIGURATION.md) |
-| Authentication & sessions | [`backend/doc/AUTHENTICATION.md`](./backend/doc/AUTHENTICATION.md) |
-| REST API reference | [`backend/doc/API_DOCUMENTATION.md`](./backend/doc/API_DOCUMENTATION.md) |
-| Backend development guide | [`backend/doc/DEVELOPMENT.md`](./backend/doc/DEVELOPMENT.md) |
-| DOT 3D specification | [`doc/dot-3d/`](./doc/dot-3d/) |
-| Day-by-day changelog | [`doc/changelog/`](./doc/changelog/) |
-| Coding conventions | `doc/STYLE_GUIDE.md` *(planned, chantier 2.2)* |
-| Architecture decisions | `doc/adr/` *(planned, chantier 2.3)* |
-| Contribution workflow | [`CONTRIBUTING.md`](./CONTRIBUTING.md) |
+| Topic                       | Doc                                                                                                                                            |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build & deploy              | [`doc/DEPLOYMENT.md`](./doc/DEPLOYMENT.md) (root) — the older [`backend/doc/DEPLOYMENT.md`](./backend/doc/DEPLOYMENT.md) is being deduplicated |
+| Environment & configuration | [`doc/SETUP_ENV_GUIDE.md`](./doc/SETUP_ENV_GUIDE.md) + [`backend/doc/CONFIGURATION.md`](./backend/doc/CONFIGURATION.md)                        |
+| Authentication & sessions   | [`backend/doc/AUTHENTICATION.md`](./backend/doc/AUTHENTICATION.md)                                                                             |
+| REST API reference          | [`backend/doc/API_DOCUMENTATION.md`](./backend/doc/API_DOCUMENTATION.md)                                                                       |
+| Backend development guide   | [`backend/doc/DEVELOPMENT.md`](./backend/doc/DEVELOPMENT.md)                                                                                   |
+| DOT 3D specification        | [`doc/dot-3d/`](./doc/dot-3d/)                                                                                                                 |
+| Day-by-day changelog        | [`doc/changelog/`](./doc/changelog/)                                                                                                           |
+| Coding conventions          | [`doc/STYLE_GUIDE.md`](./doc/STYLE_GUIDE.md)                                                                                                   |
+| Architecture decisions      | [`doc/adr/`](./doc/adr/)                                                                                                                       |
+| Contribution workflow       | [`CONTRIBUTING.md`](./CONTRIBUTING.md)                                                                                                         |

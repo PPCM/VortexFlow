@@ -26,13 +26,13 @@ cp backend/.env.example backend/.env              # backend (DB, Redis, session)
 
 ## 1. Prerequisites
 
-| Tool | Version | Notes |
-|---|---|---|
-| **Node.js** | **24.x** | CI runs Node 24 (`actions/setup-node@v5`). Backend `engines.node` requires `>=24.0.0`. Use Node 24 locally. |
-| PostgreSQL | 14+ | Backing store. Local install or Docker. |
-| Redis | 6+ | Session store and (potentially) cache. |
-| Docker / Docker Compose | optional | Quickest path to a local stack via the root `docker-compose.yml`. |
-| `gh` CLI | optional | Used by some helper commands; not required to contribute. |
+| Tool                    | Version  | Notes                                                                                                       |
+| ----------------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| **Node.js**             | **24.x** | CI runs Node 24 (`actions/setup-node@v5`). Backend `engines.node` requires `>=24.0.0`. Use Node 24 locally. |
+| PostgreSQL              | 14+      | Backing store. Local install or Docker.                                                                     |
+| Redis                   | 6+       | Session store and (potentially) cache.                                                                      |
+| Docker / Docker Compose | optional | Quickest path to a local stack via the root `docker-compose.yml`.                                           |
+| `gh` CLI                | optional | Used by some helper commands; not required to contribute.                                                   |
 
 ---
 
@@ -145,8 +145,19 @@ These three must be clean before opening a PR — CI rejects otherwise.
 (cd frontend && npm run build)             # production build smoke-test
 ```
 
-There is **no pre-commit hook** today (Husky / lint-staged are not wired up
-— planned). It's on you to run the checks above before pushing.
+A **pre-commit hook** (Husky + lint-staged) runs automatically on commit:
+Prettier formats staged `*.{json,md,yml,yaml}` files, and `eslint --fix` runs
+on the relevant sub-package when a `.js` / `.ts` / `.tsx` file is staged.
+You still need to run the full lint + typecheck + build before opening a PR
+(the hook only catches the obvious).
+
+To bootstrap the hook on a fresh clone:
+
+```bash
+npm install           # at the repo root — installs Husky and activates the hook
+```
+
+To skip the hook in a true emergency: `git commit --no-verify`.
 
 ---
 
@@ -243,11 +254,11 @@ See [`SECURITY.md`](./SECURITY.md). In short:
 
 ## 12. Pointers
 
-| Topic | Doc |
-|---|---|
-| Code conventions | [`doc/STYLE_GUIDE.md`](./doc/STYLE_GUIDE.md) |
-| Architecture | [`ARCHITECTURE.md`](./ARCHITECTURE.md) |
-| Backend topic guides | [`backend/doc/`](./backend/doc/) |
-| DOT 3D specification | [`doc/dot-3d/`](./doc/dot-3d/) |
-| Day-by-day changelog | [`doc/changelog/`](./doc/changelog/) |
-| Architecture decisions | [`doc/adr/`](./doc/adr/) |
+| Topic                  | Doc                                          |
+| ---------------------- | -------------------------------------------- |
+| Code conventions       | [`doc/STYLE_GUIDE.md`](./doc/STYLE_GUIDE.md) |
+| Architecture           | [`ARCHITECTURE.md`](./ARCHITECTURE.md)       |
+| Backend topic guides   | [`backend/doc/`](./backend/doc/)             |
+| DOT 3D specification   | [`doc/dot-3d/`](./doc/dot-3d/)               |
+| Day-by-day changelog   | [`doc/changelog/`](./doc/changelog/)         |
+| Architecture decisions | [`doc/adr/`](./doc/adr/)                     |

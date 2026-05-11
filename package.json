@@ -1,0 +1,19 @@
+{
+  "name": "vortexflow",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Root tooling — Husky + lint-staged + Prettier shared across the backend and frontend packages.",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.4.2"
+  },
+  "lint-staged": {
+    "*.{json,md,yml,yaml}": "prettier --write",
+    "backend/**/*.js": "bash -c 'cd backend && npm run lint -- --fix'",
+    "frontend/**/*.{ts,tsx}": "bash -c 'cd frontend && npm run lint -- --fix'"
+  }
+}

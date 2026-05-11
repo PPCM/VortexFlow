@@ -7,7 +7,9 @@ import { User } from '../types';
 // =====================================
 // Configuration WebSocket
 // =====================================
-const WEBSOCKET_URL = import.meta.env.VITE_WS_URL || 'http://localhost:3001';
+// Socket.IO is attached to the same HTTP server as the REST API, so the
+// fallback targets :5000 (the backend), not the frontend dev server :3000.
+const WEBSOCKET_URL = import.meta.env.VITE_WS_URL || 'http://localhost:5000';
 
 export interface WebSocketCallbacks {
   onConnect?: () => void;
