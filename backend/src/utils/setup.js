@@ -1,13 +1,40 @@
 const { User } = require('../models');
 const logger = require('./logger');
 
+// Default credentials documented in backend/.env.example. They MUST NOT be
+// used in production. See AUTH-PROD-GUARD below for the enforcement.
+const DEFAULT_ADMIN_PASSWORD = 'change-me-in-production-please';
+const LEGACY_DEFAULT_ADMIN_PASSWORD = 'VortexFlow2024!';
+
 /**
- * Setup default admin user
+ * Setup default admin user.
+ *
+ * In non-production environments this seeds an admin from
+ * ADMIN_EMAIL / ADMIN_PASSWORD (with fallbacks). In production, we REFUSE
+ * to seed an admin with a publicly-documented default password — the server
+ * boot fails fast instead, which is preferable to silently shipping a
+ * known-credential admin.
  */
 const setupAdminUser = async () => {
   try {
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@admin.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'VortexFlow2024!';
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
+
+    // AUTH-PROD-GUARD: refuse known-default passwords in production.
+    if (process.env.NODE_ENV === 'production') {
+      if (
+        adminPassword === DEFAULT_ADMIN_PASSWORD ||
+        adminPassword === LEGACY_DEFAULT_ADMIN_PASSWORD ||
+        !process.env.ADMIN_PASSWORD
+      ) {
+        const message =
+          '[FATAL] ADMIN_PASSWORD is unset or set to a publicly-documented ' +
+          'default value. Refusing to seed an admin user in production. ' +
+          'Set a strong ADMIN_PASSWORD in the environment before starting.';
+        logger.error(message);
+        throw new Error(message);
+      }
+    }
 
     // Check if admin user already exists
     const existingAdmin = await User.findByEmail(adminEmail);

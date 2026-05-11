@@ -11,6 +11,10 @@ const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
 
+// Fail fast on bad/missing env vars instead of crashing later with an opaque
+// runtime error. The validator mutates process.env to apply defaults.
+require('./src/config/env').validate();
+
 const logger = require('./src/utils/logger');
 const { sequelize } = require('./src/models');
 const authRoutes = require('./src/routes/auth');
