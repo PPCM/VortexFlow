@@ -564,61 +564,38 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     if (isInitialLoad) setIsInitialLoad(false);
   }, [dimensions.width, dimensions.height, isInitialLoad]);
 
-  // Effet pour détecter les dimensions du conteneur
+  // Track the renderer container size. The container itself is `width:100% / height:100%`
+  // so its clientWidth/Height already reflects the real space the renderer must fill.
+  // Reading any parent (tabpanel, flexGrow box, window) and applying hard-coded safety
+  // margins led to a race: on first mount, parent layout was sometimes not yet committed,
+  // so we'd capture partial dimensions and the canvas would render shrunken until reload.
   useLayoutEffect(() => {
+    const container = graphRef.current;
+    if (!container) return;
+
+    let retryFrames = 0;
+    const MAX_RETRY = 60; // cap at ~1s so we don't loop forever if container stays 0×0
+
     const updateDimensions = () => {
-      if (graphRef.current) {
-        // Chercher le conteneur parent de l'onglet "Aperçu 3D" pour obtenir l'espace réel disponible
-        let tabPanelContainer = graphRef.current.closest('[role="tabpanel"]');
-        if (!tabPanelContainer) {
-          // Fallback: chercher le conteneur parent avec flexGrow (Box principal de l'onglet)
-          tabPanelContainer = graphRef.current.closest('div[style*="flex-grow"]');
-        }
-        if (!tabPanelContainer) {
-          // Fallback final: utiliser le conteneur direct
-          tabPanelContainer = graphRef.current;
-        }
-        
-        // Utiliser des limites absolues pour éviter tout débordement
-        const maxAllowedWidth = Math.min(
-          tabPanelContainer.clientWidth,
-          window.innerWidth - 100 // Marge de sécurité
+      if (!graphRef.current) return;
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      if (width > 0 && height > 0) {
+        retryFrames = 0;
+        setDimensions((prev) =>
+          prev.width === width && prev.height === height ? prev : { width, height }
         );
-        const maxAllowedHeight = Math.min(
-          tabPanelContainer.clientHeight,
-          window.innerHeight - 200 // Marge de sécurité
-        );
-        
-        const width = maxAllowedWidth;
-        const height = maxAllowedHeight;
-        
-        console.log('3D Container dimensions calculated:', { width, height, container: tabPanelContainer.tagName });
-        
-        console.log('3D Container dimensions:', { 
-          width, 
-          height, 
-          container: tabPanelContainer.tagName,
-          classes: tabPanelContainer.className,
-          role: (tabPanelContainer as HTMLElement).getAttribute('role')
-        });
-        
-        if (width > 0 && height > 0) {
-          setDimensions({ width, height });
-        }
+      } else if (retryFrames < MAX_RETRY) {
+        retryFrames += 1;
+        requestAnimationFrame(updateDimensions);
       }
     };
-
-    updateDimensions();
 
     const resizeObserver = new ResizeObserver(() => {
       requestAnimationFrame(updateDimensions);
     });
-
-    if (graphRef.current) {
-      // Observer le conteneur parent plutôt que le conteneur direct
-      let observeTarget = graphRef.current.closest('[role="tabpanel"]') || graphRef.current;
-      resizeObserver.observe(observeTarget);
-    }
+    resizeObserver.observe(container);
+    updateDimensions();
 
     return () => {
       resizeObserver.disconnect();
@@ -1248,11 +1225,11 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         // 3d-force-graph creates link directional particles with a
         // MeshLambertMaterial that has transparent=true and opacity=undefined,
         // which renders as fully transparent. Walk the scene every 200ms and
-        // force them opaque so the particles are visible. Stop after 5s —
-        // by then every particle that will ever exist has been instantiated
-        // at least once, and re-running on every animation frame is wasted.
+        // force them opaque so the particles are visible. The patch must keep
+        // running for the lifetime of the renderer because handleEmitTrace can
+        // spawn new (still-invisible) particles long after the initial render.
+        // Cost is negligible — a single scene traversal every 200ms.
         const sceneRoot = graph.scene();
-        const patchStartedAt = performance.now();
         particlePatchInterval = setInterval(() => {
           sceneRoot.traverse((obj: any) => {
             if (
@@ -1267,10 +1244,6 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
               obj.material.needsUpdate = true;
             }
           });
-          if (performance.now() - patchStartedAt > 5000 && particlePatchInterval) {
-            clearInterval(particlePatchInterval);
-            particlePatchInterval = null;
-          }
         }, 200);
 
         // Appliquer les paramètres initiaux
@@ -1388,29 +1361,6 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
             }}
           >
             <FlashOnIcon />
-          </IconButton>
-        </Tooltip>
-
-        <Divider sx={{ width: '70%', borderColor: 'rgba(255, 255, 255, 0.08)', my: 0.5 }} />
-
-        <Tooltip title={simulationRunning ? 'Pause Simulation' : 'Démarrer Simulation'} placement="right" arrow>
-          <IconButton
-            size="small"
-            aria-label={simulationRunning ? 'Pause Simulation' : 'Start Simulation'}
-            onClick={() => {
-              if (onToggleSimulation) onToggleSimulation();
-              else setSimulationRunning(!simulationRunning);
-            }}
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: 1,
-              color: simulationRunning ? 'warning.main' : 'success.main',
-              background: simulationRunning ? 'rgba(255, 152, 0, 0.15)' : 'rgba(76, 175, 80, 0.15)',
-              '&:hover': { background: simulationRunning ? 'rgba(255, 152, 0, 0.25)' : 'rgba(76, 175, 80, 0.25)' },
-            }}
-          >
-            {simulationRunning ? <PauseIcon /> : <PlayArrowIcon />}
           </IconButton>
         </Tooltip>
 
