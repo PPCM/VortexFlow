@@ -56,12 +56,21 @@ export default defineConfig({
     coverage: {
       // Baseline matching the current numbers. Raise these as new tests land
       // for the under-covered modules (AdminPanel, GraphList, api, websocket).
-      // Per-module thresholds aren't worth the noise yet — track via reports.
+      // Per-module thresholds are added selectively for well-covered critical
+      // modules to prevent regression.
       thresholds: {
         lines: 60,
         branches: 55,
         functions: 50,
         statements: 60,
+        // ParticleSimulator is the DES core (ADR-006). Locking it high to
+        // protect against drift as Phase 4+ integrates it into the renderer.
+        'src/services/particleSimulator.ts': {
+          lines: 90,
+          branches: 85,
+          functions: 95,
+          statements: 90,
+        },
       },
     },
   },
