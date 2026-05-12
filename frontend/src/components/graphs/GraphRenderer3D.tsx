@@ -626,6 +626,62 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     onParticleReleased: onSimulatorParticleReleased,
   });
 
+  // Visualisation refs (Phase 5).
+  //
+  // The nodeVal / nodeColor accessors read these refs at render time. We
+  // update them on every simulator tick — without forcing a React rerender
+  // of the whole component (which would be wasteful) — and then ping the
+  // force graph to re-evaluate its accessors.
+  //
+  // queueStatsByNode  : current queue size + cumulative drops, keyed by node id
+  // dropFlashTime     : timestamp (performance.now ms) of the last detected drop
+  //                     for that node. Used to colour the node red for ~200ms
+  //                     after each drop event.
+  // previousDroppedCount : last-seen droppedCount per node, used to detect
+  //                     "a new drop happened" by diffing against the current snapshot.
+  const queueStatsByNodeRef = useRef<Map<string, { size: number; droppedCount: number }>>(
+    new Map()
+  );
+  const dropFlashTimeRef = useRef<Map<string, number>>(new Map());
+  const previousDroppedCountRef = useRef<Map<string, number>>(new Map());
+
+  // Drop flash duration in ms — kept short so it doesn't visually merge into
+  // sustained-saturation states.
+  const DROP_FLASH_MS = 200;
+
+  // Sync visualisation refs with the simulator's stats stream and ping the
+  // force graph so it picks up the new queue sizes (node growth) and colour
+  // overrides (saturation halo, drop flash).
+  useEffect(() => {
+    if (!simulatorStats) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+    // Detect newly-arrived drops by diffing per-node droppedCount.
+    for (const [nodeId, q] of simulatorStats.queues) {
+      const prev = previousDroppedCountRef.current.get(nodeId) ?? 0;
+      if (q.droppedCount > prev) {
+        dropFlashTimeRef.current.set(nodeId, now);
+      }
+      previousDroppedCountRef.current.set(nodeId, q.droppedCount);
+    }
+
+    queueStatsByNodeRef.current = new Map(simulatorStats.queues);
+
+    // Re-evaluate the accessors so the node sizes / colours update on screen.
+    // Calling .nodeVal(.nodeVal()) is the documented way to force 3d-force-graph
+    // to re-run the accessor on every node — cheap (no layout), safe on large
+    // graphs because it does not rebuild the scene.
+    const fg = forceGraphRef.current;
+    if (fg && typeof fg.nodeVal === 'function') {
+      try {
+        fg.nodeVal(fg.nodeVal());
+        fg.nodeColor(fg.nodeColor());
+      } catch {
+        /* ref is mid-init or being disposed — ignore */
+      }
+    }
+  }, [simulatorStats]);
+
   // First-render guard: a few downstream effects (showNodeText / showLinkText
   // reconfigure) run only after init completes. Flip the flag once dimensions
   // are known so they fire correctly.
@@ -1240,20 +1296,50 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
         // Configuration avancée des nœuds avec support des géométries 3D
         graph
-          .nodeLabel(() => '') 
+          .nodeLabel(() => '')
           .nodeVal((node: any) => {
             if (node.geometry) {
-              return 0; 
+              return 0;
             }
-            
+
             let baseSize = nodeSize;
             if (node.particleGeneration) {
               baseSize = Math.max(4, Math.min(12, 4 + node.particleGeneration / 50));
             }
-            
+
+            // Phase 5 — queue growth. When the DES simulator is in charge
+            // and the node has a defined queue_size, scale up the node
+            // proportionally to its fill ratio (1× empty → 2× full).
+            const qStat = queueStatsByNodeRef.current.get(node.id);
+            if (qStat && node.queue_size && node.queue_size > 0) {
+              const ratio = Math.min(1, qStat.size / node.queue_size);
+              return baseSize * (1 + ratio);
+            }
+
             return baseSize;
           })
-          .nodeColor((node: any) => node.color || '#4fc3f7')
+          .nodeColor((node: any) => {
+            // Phase 5 — colour overrides, evaluated each frame via refs.
+            // Priority: drop flash > saturation halo > role tint > user colour.
+            const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+            const lastFlash = dropFlashTimeRef.current.get(node.id);
+            if (lastFlash !== undefined && now - lastFlash < DROP_FLASH_MS) {
+              return '#ff1744'; // drop flash, red vif
+            }
+            const qStat = queueStatsByNodeRef.current.get(node.id);
+            if (qStat && node.queue_size && node.queue_size > 0) {
+              const ratio = qStat.size / node.queue_size;
+              if (ratio >= 1) return '#d32f2f'; // saturated
+              if (ratio > 0.8) return '#ff9800'; // near-saturated
+            }
+            // Role tint applied only when the user did not specify a colour,
+            // so explicit DOT colours are always preserved.
+            if (!node.color) {
+              if (node.nodeRole === 'generator') return '#80cbc4'; // teal
+              if (node.nodeRole === 'sink') return '#9fa8da'; // indigo
+            }
+            return node.color || '#4fc3f7';
+          })
           .nodeThreeObject(nodeThreeObjectCallback)
           .linkLabel((link: any) => showLinkText && link.name ? link.name : '')
           .linkThreeObjectExtend(true)
@@ -1529,6 +1615,11 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
               { k: 'Particules', v: simulationStats.totalParticles, color: 'success.main' },
               { k: 'Latence', v: `${simulationStats.averageLatency} ms`, color: 'info.main' },
               { k: 'Goulots', v: simulationStats.bottleneckNodes, color: 'error.main' },
+              // Phase 5 — drops surface only when the DES simulator is in
+              // charge. Heuristic mode (no generators) has no notion of drop.
+              ...(hasGenerators && simulatorStats
+                ? [{ k: 'Drops', v: simulatorStats.totalDropped, color: 'error.main' }]
+                : []),
             ].map((s) => (
               <Box key={s.k} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 38 }}>
                 <Typography sx={{ fontSize: 10, letterSpacing: 0.4, textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
