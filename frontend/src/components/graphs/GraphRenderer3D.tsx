@@ -25,6 +25,7 @@ import ForceGraph3D from '3d-force-graph';
 import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 import { GraphData } from '../../types';
+import { useParticleSimulator } from '../../hooks/useParticleSimulator';
 
 // Déclaration de type pour THREE.js global
 declare global {
@@ -63,6 +64,12 @@ interface ForceGraphNode {
   image?: string;
   autoResize?: boolean;
   bloomEffect?: boolean;
+  // DES attributes (ADR-006) — consumed by ParticleSimulator
+  nodeRole?: 'generator' | 'relay' | 'sink';
+  dropPolicy?: 'tail' | 'head' | 'reject';
+  queue_size?: number;
+  processing_time?: number;
+  failure_rate?: number;
 }
 
 interface ForceGraphLink {
@@ -237,6 +244,16 @@ export class DotTo3DConverter {
         color: attrs.color
       });
       
+      const validRoles: Array<NonNullable<ForceGraphNode['nodeRole']>> = [
+        'generator',
+        'relay',
+        'sink',
+      ];
+      const validDropPolicies: Array<NonNullable<ForceGraphNode['dropPolicy']>> = [
+        'tail',
+        'head',
+        'reject',
+      ];
       const node: ForceGraphNode = {
         id: nodeId,
         name: attrs.name || attrs.label || nodeId,
@@ -246,11 +263,23 @@ export class DotTo3DConverter {
         // Extensions 3D pour les nœuds
         geometry: this.parseGeometry(attrs.geometry),
         dimensions: this.parseDimensions(attrs.dimensions),
-        particleGeneration: attrs.particleGeneration ? parseInt(attrs.particleGeneration) : undefined,
-        maxParticleProcessing: attrs.maxParticleProcessing ? parseInt(attrs.maxParticleProcessing) : undefined,
+        particleGeneration: attrs.particleGeneration ? parseFloat(attrs.particleGeneration) : undefined,
+        maxParticleProcessing: attrs.maxParticleProcessing
+          ? parseFloat(attrs.maxParticleProcessing)
+          : undefined,
         image: attrs.image,
         autoResize: attrs.autoResize ? this.parseBoolean(attrs.autoResize) : undefined,
-        bloomEffect: attrs.bloomEffect ? this.parseBoolean(attrs.bloomEffect) : undefined
+        bloomEffect: attrs.bloomEffect ? this.parseBoolean(attrs.bloomEffect) : undefined,
+        // DES attributes (ADR-006)
+        nodeRole: validRoles.includes(attrs.nodeRole as any)
+          ? (attrs.nodeRole as ForceGraphNode['nodeRole'])
+          : undefined,
+        dropPolicy: validDropPolicies.includes(attrs.dropPolicy as any)
+          ? (attrs.dropPolicy as ForceGraphNode['dropPolicy'])
+          : undefined,
+        queue_size: attrs.queue_size ? parseInt(attrs.queue_size, 10) : undefined,
+        processing_time: attrs.processing_time ? parseFloat(attrs.processing_time) : undefined,
+        failure_rate: attrs.failure_rate ? parseFloat(attrs.failure_rate) : undefined,
       };
       
       console.log(`✅ Nœud ${nodeId} final:`, node);
@@ -356,6 +385,20 @@ export class DotTo3DConverter {
     // Convertir les nœuds du backend
     if (backendData.nodes) {
       for (const node of backendData.nodes) {
+        // DES attributes pass through as numbers/strings — the simulator
+        // applies its own defaults if undefined.
+        const validRoles: Array<NonNullable<ForceGraphNode['nodeRole']>> = [
+          'generator',
+          'relay',
+          'sink',
+        ];
+        const validDropPolicies: Array<NonNullable<ForceGraphNode['dropPolicy']>> = [
+          'tail',
+          'head',
+          'reject',
+        ];
+        const nodeRole = validRoles.includes(node.nodeRole) ? node.nodeRole : undefined;
+        const dropPolicy = validDropPolicies.includes(node.dropPolicy) ? node.dropPolicy : undefined;
         nodes.push({
           id: node.id,
           name: node.label || node.name || node.id,
@@ -364,11 +407,17 @@ export class DotTo3DConverter {
           color: node.color || '#1976D2',
           geometry: this.parseGeometry(node.geometry),
           dimensions: this.parseDimensions(node.dimensions),
-          particleGeneration: node.particleGeneration ? parseInt(node.particleGeneration) : undefined,
-          maxParticleProcessing: node.maxParticleProcessing ? parseInt(node.maxParticleProcessing) : undefined,
+          particleGeneration: node.particleGeneration ? parseFloat(node.particleGeneration) : undefined,
+          maxParticleProcessing: node.maxParticleProcessing ? parseFloat(node.maxParticleProcessing) : undefined,
           image: node.image,
           autoResize: node.autoResize ? this.parseBoolean(node.autoResize) : undefined,
-          bloomEffect: node.bloomEffect ? this.parseBoolean(node.bloomEffect) : undefined
+          bloomEffect: node.bloomEffect ? this.parseBoolean(node.bloomEffect) : undefined,
+          // DES attributes (ADR-006)
+          nodeRole,
+          dropPolicy,
+          queue_size: node.queue_size ? parseInt(node.queue_size, 10) : undefined,
+          processing_time: node.processing_time ? parseFloat(node.processing_time) : undefined,
+          failure_rate: node.failure_rate ? parseFloat(node.failure_rate) : undefined,
         });
       }
     }
@@ -548,6 +597,34 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
   // État pour stocker les données du graphique
   const [currentGraphData, setCurrentGraphData] = useState<{nodes: ForceGraphNode[], links: ForceGraphLink[]}>({nodes: [], links: []});
+
+  // DES particle simulator (ADR-006). The hook owns the simulator instance,
+  // drives it via rAF, and surfaces stats via React state. We wire its
+  // `onParticleReleased` to `emitParticle` on the 3d-force-graph instance so
+  // each logical release produces a visible animation.
+  const onSimulatorParticleReleased = useCallback((linkId: string) => {
+    const fg = forceGraphRef.current;
+    if (!fg || typeof fg.emitParticle !== 'function') return;
+    // The simulator generates link ids as "<source>-><target>#<counter>".
+    // Resolve back to the link object in the live graph to call emitParticle.
+    const data = fg.graphData();
+    if (!data?.links?.length) return;
+    const match = linkId.match(/^(.+)->(.+?)#\d+$/);
+    if (!match) return;
+    const [, source, target] = match;
+    const link = data.links.find((l: any) => {
+      const sId = typeof l.source === 'object' ? l.source.id : l.source;
+      const tId = typeof l.target === 'object' ? l.target.id : l.target;
+      return sId === source && tId === target;
+    });
+    if (link) fg.emitParticle(link);
+  }, []);
+
+  const { stats: simulatorStats, hasGenerators } = useParticleSimulator({
+    graphData: currentGraphData,
+    isRunning: simulationRunning,
+    onParticleReleased: onSimulatorParticleReleased,
+  });
 
   // First-render guard: a few downstream effects (showNodeText / showLinkText
   // reconfigure) run only after init completes. Flip the flag once dimensions
@@ -764,12 +841,18 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
   const updateParticleProperties = useCallback(() => {
     if (!forceGraphRef.current) return;
-    
+
     forceGraphRef.current
       // Particles only emit while a simulation is running. Outside of that,
       // every link reports 0 so nothing flows on idle graphs.
+      //
+      // When the DES simulator owns emission (hasGenerators === true), this
+      // returns 0 — the simulator's onParticleReleased drives emitParticle()
+      // explicitly. We keep the legacy continuous flow only as a fallback
+      // for graphs that don't declare nodeRole=generator anywhere.
       .linkDirectionalParticles((link: any) => {
         if (!showParticles || !simulationRunning) return 0;
+        if (hasGenerators) return 0;
         if (link.maxParticleFlow && link.maxParticleFlow > 0) {
           return Math.max(1, Math.min(10, Math.floor(link.maxParticleFlow / 20)));
         }
@@ -798,11 +881,15 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       // link.color here: dark link colors (and unlit Lambert fallbacks) made
       // particles render almost black, masking labels behind them.
       .linkDirectionalParticleColor(() => '#ffd54f');
-  }, [showParticles, simulationRunning]);
+  }, [showParticles, simulationRunning, hasGenerators]);
 
-  // Simulation temps réel des accumulations
+  // Simulation temps réel des accumulations (fallback heuristique).
+  // Désactivé quand le DES simulator est en charge (hasGenerators=true) :
+  // dans ce cas, les stats viennent directement de simulatorStats via
+  // l'effect ci-dessous.
   useEffect(() => {
     if (!simulationRunning || !currentGraphData?.nodes) return;
+    if (hasGenerators) return;
     
     // Track in-degree and link traversal time so that even DOT graphs without
     // VortexFlow attributes get meaningful stats once the sim is running.
@@ -873,23 +960,45 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         forceGraphRef.current.nodeVal(undefined);
       }
     }, 100);
-    
+
     return () => clearInterval(interval);
-  }, [simulationRunning, currentGraphData, nodeAccumulation]);
+  }, [simulationRunning, currentGraphData, nodeAccumulation, hasGenerators]);
+
+  // Branch real-time stats from the DES simulator into simulationStats so the
+  // existing HUD doesn't need to change shape. Only active when the simulator
+  // is in charge (hasGenerators === true); otherwise the heuristic effect
+  // above continues to populate simulationStats.
+  useEffect(() => {
+    if (!hasGenerators || !simulatorStats) return;
+    // Count "bottleneck" nodes as those with a non-trivial queue size.
+    let bottleneckCount = 0;
+    for (const q of simulatorStats.queues.values()) {
+      if (q.size > 5) bottleneckCount++;
+    }
+    setSimulationStats({
+      totalParticles: simulatorStats.particlesInFlight,
+      averageLatency: Number.isNaN(simulatorStats.averageLatencyMs)
+        ? 0
+        : Math.round(simulatorStats.averageLatencyMs),
+      bottleneckNodes: bottleneckCount,
+    });
+  }, [hasGenerators, simulatorStats]);
 
   // One-shot trace: send a single particle from every emitter node and let it
   // cascade through outgoing links so the user can follow the path without
   // particles accumulating. Cycles are short-circuited by a visited set.
+  //
+  // V1 stricte (ADR-006): seuls les nœuds nodeRole=generator émettent. Plus
+  // de fallback "tout émetteur" basé sur particleGeneration > 0 — la règle
+  // est désormais purement basée sur le rôle. Si aucun nœud n'est generator,
+  // le bouton ne fait rien (le UI le signale via hasGenerators).
   const handleEmitTrace = useCallback(() => {
     const fg = forceGraphRef.current;
     if (!fg || typeof fg.emitParticle !== 'function') return;
     const data = fg.graphData();
     if (!data?.nodes?.length) return;
 
-    const hasVortexEmitters = data.nodes.some((n: any) => n.particleGeneration > 0);
-    const isEmitter = (node: any) => (
-      hasVortexEmitters ? (node.particleGeneration || 0) > 0 : true
-    );
+    const isEmitter = (node: any) => node.nodeRole === 'generator';
 
     const visited = new Set<string>();
     const fireFrom = (nodeId: string, depth: number) => {
@@ -1195,6 +1304,10 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           })
           .linkDirectionalParticles((link: any) => {
             if (!showParticles || !simulationRunning) return 0;
+            // DES simulator owns emission when at least one generator is
+            // declared (ADR-006). Continuous flow is a fallback for
+            // un-annotated graphs.
+            if (hasGenerators) return 0;
             if (link.maxParticleFlow) {
               return Math.min(8, Math.max(1, Math.floor(link.maxParticleFlow / 10)));
             }

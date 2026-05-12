@@ -121,7 +121,8 @@ const DOT = 'digraph G { A -> B; B -> C; A -> C; }';
 // Stub the global fetch so that path returns a deterministic graph.
 const SAMPLE_PARSE = {
   nodes: [
-    { id: 'A', name: 'A', particleGeneration: 5, maxParticleProcessing: 3 },
+    // A is the lone generator (ADR-006 V1 strict: only nodeRole=generator emits).
+    { id: 'A', name: 'A', nodeRole: 'generator', particleGeneration: 5, maxParticleProcessing: 3 },
     { id: 'B', name: 'B' },
     { id: 'C', name: 'C' },
   ],
@@ -204,16 +205,20 @@ describe('GraphRenderer3D — particles gated by simulationRunning', () => {
     expect(cb({ name: 'a-b' })).toBe(0);
   });
 
-  test('linkDirectionalParticles emits >0 once the simulation is running', async () => {
+  test('linkDirectionalParticles still returns 0 when running with generators (DES mode)', async () => {
+    // With at least one nodeRole=generator (SAMPLE_PARSE), the DES simulator
+    // owns emission and the continuous-flow fallback stays disabled even
+    // while the simulation is running. The simulator calls emitParticle
+    // directly through onParticleReleased — checked in a separate test.
     const { rerender } = render(<GraphRenderer3D dotContent={DOT} isValid isSimulationRunning={false} />);
     await advancePastInit();
 
     rerender(<GraphRenderer3D dotContent={DOT} isValid isSimulationRunning />);
-    // After the prop flips, updateParticleProperties re-runs — wait for the
-    // callback to be reinstalled with the new behaviour.
+    // Give updateParticleProperties one render to reinstall the callback.
     await waitFor(() => {
-      expect(fgState.callbacks.linkDirectionalParticles({ name: 'a-b' })).toBeGreaterThan(0);
+      expect(fgState.callbacks.linkDirectionalParticles).toBeDefined();
     });
+    expect(fgState.callbacks.linkDirectionalParticles({ name: 'a-b' })).toBe(0);
   });
 });
 
