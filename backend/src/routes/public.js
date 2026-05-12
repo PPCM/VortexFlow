@@ -190,7 +190,13 @@ router.post('/parse-dot',
         maxParticleProcessing: node.attributes.maxParticleProcessing,
         image: node.attributes.image,
         autoResize: node.attributes.autoResize,
-        bloomEffect: node.attributes.bloomEffect
+        bloomEffect: node.attributes.bloomEffect,
+        // DES attributes (ADR-006) — consumed by the in-browser ParticleSimulator
+        nodeRole: node.attributes.nodeRole,
+        dropPolicy: node.attributes.dropPolicy,
+        queue_size: node.attributes.queue_size,
+        processing_time: node.attributes.processing_time,
+        failure_rate: node.attributes.failure_rate
       }));
       
       const links = parseResult.ast.edges.map(edge => ({
