@@ -1,7 +1,7 @@
 # ADR-006: Particle simulation moves from continuous animation to discrete event simulation (DES)
 
-- **Status:** Proposed
-- **Date:** 2026-05-11
+- **Status:** Accepted
+- **Date:** 2026-05-11 (Proposed) / 2026-05-12 (Accepted — implementation complete, 11 commits on `feature/des-simulation`, PR #30)
 - **Tags:** frontend, simulation, dot, renderer, performance
 
 ## Context

@@ -309,6 +309,70 @@ Quand l'accumulation dépasse 80 particules, le nœud commence à "briller" :
 
 ## 💡 Exemples Pratiques Complets
 
+### Exemple 0 : Pipeline DES avec goulot et drops (ADR-006)
+
+Le plus pédagogique pour découvrir la simulation événementielle. Une source rapide
+envoie 10 particules/seconde dans un goulot qui n'en traite que 5/s avec une file
+de 5 emplacements et un `dropPolicy="tail"` — donc, dès que la file est saturée,
+les nouvelles particules sont droppées avant d'entrer.
+
+```dot
+digraph SaturationDemo {
+    defaultNodeSize = 1.2;
+    particlesEnabled = true;
+
+    FastSource [
+        label="Source rapide",
+        nodeRole="generator",
+        particleGeneration=10,        // 10 particules/seconde
+        geometry="Cone"
+    ];
+
+    Bottleneck [
+        label="Goulot",
+        nodeRole="relay",
+        maxParticleProcessing=1,       // 1 slot de traitement parallèle
+        processing_time=200,           // 200 ms par particule → débit 5/s
+        queue_size=5,                  // file de 5 emplacements
+        dropPolicy="tail",             // drop l'entrante quand la file est pleine
+        geometry="Cylinder"
+    ];
+
+    Sink [
+        label="Sortie",
+        nodeRole="sink",
+        geometry="Sphere"
+    ];
+
+    FastSource -> Bottleneck [particleSpeed=6];
+    Bottleneck -> Sink [particleSpeed=6];
+}
+```
+
+**Ce qui se passe à l'écran après ▶** :
+
+1. **Émission régulière** : la source émet 1 particule toutes les 100 ms.
+2. **Accumulation** : le goulot grossit visuellement à mesure que sa file se remplit
+   (jusqu'à 2× sa taille de base).
+3. **Halo** : à 80 % de remplissage, le nœud devient orange. À 100 %, il devient rouge.
+4. **Flash drop** : à chaque drop (queue pleine), le nœud flashe rouge vif pendant 200 ms.
+5. **HUD** : les chips `Drops`, `File max` et `Débit` (en bas à droite) chiffrent
+   l'effet en temps réel. Survole-les pour avoir l'explication.
+
+Change `dropPolicy="tail"` en `"head"` pour voir la différence : c'est alors la
+particule la plus ancienne qui est jetée à chaque saturation. La file reste à
+la même taille, mais le débit observé en sortie change subtilement parce que
+les particules les plus récentes ont systématiquement la priorité.
+
+**Variantes à expérimenter** :
+
+- `maxParticleProcessing=5` → 5 slots parallèles, débit 25 p/s, file vide en
+  permanence si l'entrée reste à 10/s.
+- `failure_rate=0.1` → 10 % des particules sortantes sont droppées (sémantique
+  "le service échoue").
+- Ajoute un 2e générateur convergent pour reproduire le scénario `convergence`
+  des tests d'intégration.
+
 ### Exemple 1 : Réseau de Distribution
 
 ```dot
