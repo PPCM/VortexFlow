@@ -582,7 +582,10 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   const [simulationStats, setSimulationStats] = useState({
     totalParticles: 0,
     averageLatency: 0,
-    bottleneckNodes: 0
+    bottleneckNodes: 0,
+    // Phase 6 — session-scoped DES metrics. Reset on simulator (re)start.
+    maxQueueSize: 0,
+    throughputPerSec: 0,
   });
 
   // Mirror the global simulation state (driven by the toolbar) into the
@@ -644,6 +647,16 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   );
   const dropFlashTimeRef = useRef<Map<string, number>>(new Map());
   const previousDroppedCountRef = useRef<Map<string, number>>(new Map());
+  // Phase 6 — session-scoped HUD metrics.
+  // maxQueueSeenRef: highest pending count observed across all relays since
+  //   the last start(). Reset on start.
+  // throughputSamplesRef: sliding window of (time, totalEmitted) samples used
+  //   to compute particles/sec. Trimmed to the last 2 seconds.
+  const maxQueueSeenRef = useRef(0);
+  const throughputSamplesRef = useRef<{ time: number; totalEmitted: number }[]>([]);
+  // Detect simulator (re)start (false→true edge on simulationRunning) to
+  // reset session-scoped refs in sync with the simulator's own start() reset.
+  const prevSimulationRunningRef = useRef(false);
 
   // Drop flash duration in ms — kept short so it doesn't visually merge into
   // sustained-saturation states.
@@ -657,12 +670,26 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
     // Detect newly-arrived drops by diffing per-node droppedCount.
+    // Also track the largest queue size seen this session (Phase 6).
     for (const [nodeId, q] of simulatorStats.queues) {
       const prev = previousDroppedCountRef.current.get(nodeId) ?? 0;
       if (q.droppedCount > prev) {
         dropFlashTimeRef.current.set(nodeId, now);
       }
       previousDroppedCountRef.current.set(nodeId, q.droppedCount);
+      if (q.size > maxQueueSeenRef.current) {
+        maxQueueSeenRef.current = q.size;
+      }
+    }
+
+    // Phase 6 — append a throughput sample, trim to the last 2 s.
+    throughputSamplesRef.current.push({ time: now, totalEmitted: simulatorStats.totalEmitted });
+    const cutoff = now - 2000;
+    while (
+      throughputSamplesRef.current.length > 0 &&
+      throughputSamplesRef.current[0].time < cutoff
+    ) {
+      throughputSamplesRef.current.shift();
     }
 
     queueStatsByNodeRef.current = new Map(simulatorStats.queues);
@@ -1031,14 +1058,40 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
     for (const q of simulatorStats.queues.values()) {
       if (q.size > 5) bottleneckCount++;
     }
+    // Phase 6 — instantaneous throughput from the sliding window.
+    let throughputPerSec = 0;
+    const samples = throughputSamplesRef.current;
+    if (samples.length >= 2) {
+      const first = samples[0];
+      const last = samples[samples.length - 1];
+      const dtMs = last.time - first.time;
+      if (dtMs > 0) {
+        throughputPerSec = Math.round(((last.totalEmitted - first.totalEmitted) / dtMs) * 1000);
+      }
+    }
     setSimulationStats({
       totalParticles: simulatorStats.particlesInFlight,
       averageLatency: Number.isNaN(simulatorStats.averageLatencyMs)
         ? 0
         : Math.round(simulatorStats.averageLatencyMs),
       bottleneckNodes: bottleneckCount,
+      maxQueueSize: maxQueueSeenRef.current,
+      throughputPerSec,
     });
   }, [hasGenerators, simulatorStats]);
+
+  // Reset session-scoped HUD refs on simulator (re)start. We mirror the
+  // simulator's own reset-on-start contract (D5) so the HUD doesn't carry
+  // stale data across runs.
+  useEffect(() => {
+    if (simulationRunning && !prevSimulationRunningRef.current) {
+      maxQueueSeenRef.current = 0;
+      throughputSamplesRef.current = [];
+      previousDroppedCountRef.current.clear();
+      dropFlashTimeRef.current.clear();
+    }
+    prevSimulationRunningRef.current = simulationRunning;
+  }, [simulationRunning]);
 
   // One-shot trace: send a single particle from every emitter node and let it
   // cascade through outgoing links so the user can follow the path without
@@ -1612,23 +1665,82 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           <>
             <Box sx={{ width: 1, background: 'rgba(255, 255, 255, 0.08)' }} />
             {[
-              { k: 'Particules', v: simulationStats.totalParticles, color: 'success.main' },
-              { k: 'Latence', v: `${simulationStats.averageLatency} ms`, color: 'info.main' },
-              { k: 'Goulots', v: simulationStats.bottleneckNodes, color: 'error.main' },
+              {
+                k: 'Particules',
+                v: simulationStats.totalParticles,
+                color: 'success.main',
+                tip: 'Particules actuellement en transit sur les liens.',
+              },
+              {
+                k: 'Latence',
+                v: `${simulationStats.averageLatency} ms`,
+                color: 'info.main',
+                tip: 'Latence moyenne d\'une particule depuis l\'émission jusqu\'à l\'arrivée à un sink.',
+              },
+              {
+                k: 'Goulots',
+                v: simulationStats.bottleneckNodes,
+                color: 'error.main',
+                tip: 'Nœuds avec plus de 5 particules en file d\'attente — signale une accumulation.',
+              },
               // Phase 5 — drops surface only when the DES simulator is in
               // charge. Heuristic mode (no generators) has no notion of drop.
+              // Phase 6 — File max + Débit instantané (DES-only too).
               ...(hasGenerators && simulatorStats
-                ? [{ k: 'Drops', v: simulatorStats.totalDropped, color: 'error.main' }]
+                ? [
+                    {
+                      k: 'Drops',
+                      v: simulatorStats.totalDropped,
+                      color: 'error.main',
+                      tip: 'Cumul des particules droppées (queue pleine, failure_rate, no_outlet).',
+                    },
+                    {
+                      k: 'File max',
+                      v: simulationStats.maxQueueSize,
+                      color: 'warning.main',
+                      tip: 'Plus grande file constatée depuis le démarrage de la simulation.',
+                    },
+                    {
+                      k: 'Débit',
+                      v: `${simulationStats.throughputPerSec}/s`,
+                      color: 'info.main',
+                      tip: 'Débit instantané (particules/seconde) sur les 2 dernières secondes.',
+                    },
+                  ]
                 : []),
             ].map((s) => (
-              <Box key={s.k} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 38 }}>
-                <Typography sx={{ fontSize: 10, letterSpacing: 0.4, textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
-                  {s.k}
-                </Typography>
-                <Typography sx={{ fontFamily: 'ui-monospace, monospace', fontWeight: 600, fontSize: 16, color: s.color }}>
-                  {s.v}
-                </Typography>
-              </Box>
+              <Tooltip key={s.k} title={s.tip ?? ''} placement="bottom" arrow>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    minWidth: 38,
+                    cursor: s.tip ? 'help' : 'default',
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: 10,
+                      letterSpacing: 0.4,
+                      textTransform: 'uppercase',
+                      color: 'rgba(255,255,255,0.5)',
+                    }}
+                  >
+                    {s.k}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontFamily: 'ui-monospace, monospace',
+                      fontWeight: 600,
+                      fontSize: 16,
+                      color: s.color,
+                    }}
+                  >
+                    {s.v}
+                  </Typography>
+                </Box>
+              </Tooltip>
             ))}
           </>
         )}
