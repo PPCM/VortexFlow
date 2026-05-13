@@ -431,19 +431,24 @@ const GraphList: React.FC = () => {
         )}
         
         {canEdit() && (
-          <MenuItem onClick={() => { handleMenuClose(); setDuplicateDialogOpen(true); }}>
+          // Close only the menu anchor — keep selectedGraphId set so the
+          // dialog can read it. handleMenuClose() would null it out and
+          // handleDuplicate's `if (selectedGraphId && ...)` guard would fail.
+          <MenuItem onClick={() => { setMenuAnchorEl(null); setDuplicateDialogOpen(true); }}>
             <FileCopy sx={{ mr: 1 }} />
             Dupliquer
           </MenuItem>
         )}
-        
+
         <MenuItem onClick={() => { handleMenuClose(); /* Implémenter partage */ }}>
           <Share sx={{ mr: 1 }} />
           Partager
         </MenuItem>
-        
+
         {canEdit() && (
-          <MenuItem onClick={() => { handleMenuClose(); setDeleteDialogOpen(true); }} sx={{ color: 'error.main' }}>
+          // Same caveat as Dupliquer above: preserve selectedGraphId so
+          // handleDelete's guard passes when the dialog confirms.
+          <MenuItem onClick={() => { setMenuAnchorEl(null); setDeleteDialogOpen(true); }} sx={{ color: 'error.main' }}>
             <Delete sx={{ mr: 1 }} />
             Supprimer
           </MenuItem>

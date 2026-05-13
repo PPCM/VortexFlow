@@ -105,4 +105,42 @@ describe('GraphList', () => {
     render(<GraphList />);
     await waitFor(() => expect(ctx.loadGraphs).toHaveBeenCalled());
   });
+
+  // Regression: the menu item used to call handleMenuClose() which nulled
+  // selectedGraphId before the confirmation dialog could read it, so the
+  // dialog's "Supprimer" button became a no-op (no deleteGraph call).
+  test('Supprimer flow calls deleteGraph with the selected graph id', async () => {
+    const ctx = baseGraphCtx({
+      state: { graphs: [fakeGraph({ id: 42, name: 'Alpha' })] },
+    });
+    mockUseGraph.mockReturnValue(ctx);
+    const { container } = render(<GraphList />);
+    // Open the per-card kebab menu (MoreVert button — only icon-only btn
+    // in the card with no accessible name).
+    const moreBtn = container.querySelector('[data-testid="MoreVertIcon"]')!.closest('button')!;
+    userEvent.click(moreBtn);
+    // Click "Supprimer" in the menu → opens the confirmation dialog.
+    userEvent.click(await screen.findByRole('menuitem', { name: /Supprimer/i }));
+    // Click the dialog's "Supprimer" button.
+    const dialog = await screen.findByRole('dialog');
+    userEvent.click(dialog.querySelector('button.MuiButton-containedError')! as HTMLElement);
+    await waitFor(() => expect(ctx.deleteGraph).toHaveBeenCalledWith(42));
+  });
+
+  // Regression (same root cause as above): Dupliquer was also broken.
+  test('Dupliquer flow calls duplicateGraph with the selected graph id', async () => {
+    const ctx = baseGraphCtx({
+      state: { graphs: [fakeGraph({ id: 99, name: 'Beta' })] },
+    });
+    mockUseGraph.mockReturnValue(ctx);
+    const { container } = render(<GraphList />);
+    const moreBtn = container.querySelector('[data-testid="MoreVertIcon"]')!.closest('button')!;
+    userEvent.click(moreBtn);
+    userEvent.click(await screen.findByRole('menuitem', { name: /Dupliquer/i }));
+    const dialog = await screen.findByRole('dialog');
+    // The duplicate name input must be filled before the submit button is enabled.
+    userEvent.type(dialog.querySelector('input')!, 'Beta-copy');
+    userEvent.click(dialog.querySelector('button.MuiButton-containedPrimary')! as HTMLElement);
+    await waitFor(() => expect(ctx.duplicateGraph).toHaveBeenCalledWith(99, 'Beta-copy'));
+  });
 });
