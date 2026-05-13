@@ -113,108 +113,174 @@ const createSampleData = async () => {
       return;
     }
 
-    // Create sample graphs
+    // VortexFlow Showcase — single demo graph exercising every documented
+    // capability: the three nodeRoles (generator / relay / sink), all five 3D
+    // geometries (Sphere / Box / Cylinder / Cone / Torus), both dropPolicies
+    // (tail / head), failure_rate, weighted maxParticleFlow routing, variable
+    // particleSpeed, queue saturation and legacy attributes (bandwidth /
+    // capacity / latency). Used as the out-of-the-box demo when an admin
+    // first opens the app.
     const sampleGraphs = [
       {
-        title: 'Simple Network Flow',
-        description: 'A basic network topology with routers and servers',
-        dot_code: `digraph NetworkFlow {
+        title: 'VortexFlow Showcase',
+        description: 'Démonstration complète : générateurs, relais, sinks, '
+          + 'les 5 géométries 3D, drop policies, failure_rate, routage pondéré '
+          + 'et saturation de file. Le pipeline simule un flux IoT : capteurs '
+          + '→ load balancer → cluster de processeurs (un instable, un lent) '
+          + '→ cache mémoire → archive rapide / analytics avec filtre saturé.',
+        dot_code: `digraph VortexFlowShowcase {
   rankdir=LR;
-  
-  // Nodes with simulation properties
-  Router1 [label="Router A", capacity=100, processing_time=1.0, node_type="router"]
-  Server1 [label="Web Server", capacity=50, processing_time=2.0, node_type="server"]
-  Server2 [label="Database", capacity=200, processing_time=0.5, node_type="database"]
-  
-  // Edges with flow properties
-  Router1 -> Server1 [bandwidth=10, latency=0.2, data_type="http_requests"]
-  Server1 -> Server2 [bandwidth=5, latency=0.1, data_type="db_queries"]
+  defaultNodeSize=1.2;
+  particlesEnabled=true;
+  autoColors=false;
+
+  // ---------------------------------------------------------------
+  // Generators — IoT sensors emitting telemetry packets (Cone)
+  // ---------------------------------------------------------------
+  SensorA [
+    label="Capteur A",
+    nodeRole="generator",
+    particleGeneration=3,
+    geometry="Cone",
+    dimensions="{radius: 0.8, height: 1.6}",
+    color="#ff6b35"
+  ];
+
+  SensorB [
+    label="Capteur B",
+    nodeRole="generator",
+    particleGeneration=2,
+    geometry="Cone",
+    dimensions="{radius: 0.8, height: 1.6}",
+    color="#ffa726"
+  ];
+
+  // ---------------------------------------------------------------
+  // Load balancer — weighted dispatch (Torus ring)
+  // ---------------------------------------------------------------
+  LoadBalancer [
+    label="Load Balancer",
+    nodeRole="relay",
+    maxParticleProcessing=20,
+    queue_size=50,
+    processing_time=100,
+    geometry="Torus",
+    dimensions="{radius: 1.2, tube: 0.4}",
+    color="#42a5f5"
+  ];
+
+  // ---------------------------------------------------------------
+  // Compute cluster — three parallel processors (Cylinder).
+  //   P1 = nominal, P2 = unstable (failure_rate), P3 = slow goulot.
+  // ---------------------------------------------------------------
+  Processor1 [
+    label="Processeur P1",
+    nodeRole="relay",
+    maxParticleProcessing=5,
+    queue_size=20,
+    processing_time=300,
+    geometry="Cylinder",
+    dimensions="{radius: 0.7, height: 1.8}",
+    color="#66bb6a"
+  ];
+
+  Processor2 [
+    label="Processeur P2 (instable)",
+    nodeRole="relay",
+    maxParticleProcessing=4,
+    queue_size=15,
+    processing_time=400,
+    failure_rate=0.25,
+    geometry="Cylinder",
+    dimensions="{radius: 0.7, height: 1.8}",
+    color="#ef5350"
+  ];
+
+  Processor3 [
+    label="Processeur P3 (lent)",
+    nodeRole="relay",
+    maxParticleProcessing=1,
+    queue_size=10,
+    processing_time=800,
+    geometry="Cylinder",
+    dimensions="{radius: 0.7, height: 1.8}",
+    color="#ab47bc"
+  ];
+
+  // ---------------------------------------------------------------
+  // In-memory cache — fast aggregator (Sphere)
+  // ---------------------------------------------------------------
+  Cache [
+    label="Cache mémoire",
+    nodeRole="relay",
+    maxParticleProcessing=30,
+    queue_size=100,
+    processing_time=50,
+    geometry="Sphere",
+    dimensions="{radius: 1.0}",
+    color="#26c6da"
+  ];
+
+  // ---------------------------------------------------------------
+  // Analytics filter — saturated relay, dropPolicy="tail"
+  // ---------------------------------------------------------------
+  Filter [
+    label="Filtre Analytics",
+    nodeRole="relay",
+    maxParticleProcessing=2,
+    queue_size=5,
+    dropPolicy="tail",
+    processing_time=1500,
+    geometry="Cylinder",
+    dimensions="{radius: 0.6, height: 1.4}",
+    color="#ffca28"
+  ];
+
+  // ---------------------------------------------------------------
+  // Sinks — terminal storage (Box). Analytics also demos dropPolicy="head".
+  // ---------------------------------------------------------------
+  Archive [
+    label="Archive S3",
+    nodeRole="sink",
+    geometry="Box",
+    dimensions="{width: 2.0, height: 1.4, depth: 1.4}",
+    color="#5c6bc0"
+  ];
+
+  Analytics [
+    label="Analytics DB",
+    nodeRole="sink",
+    queue_size=10,
+    dropPolicy="head",
+    geometry="Box",
+    dimensions="{width: 2.0, height: 1.4, depth: 1.4}",
+    color="#7e57c2"
+  ];
+
+  // ---------------------------------------------------------------
+  // Edges — bandwidth/latency/capacity legacy attrs + DES particleSpeed
+  // + maxParticleFlow weighting (60/30/10 split downstream of LB).
+  // ---------------------------------------------------------------
+  SensorA -> LoadBalancer [label="3 p/s", particleSpeed=1.5, bandwidth=10, latency=0.05, color="#ff6b35"];
+  SensorB -> LoadBalancer [label="2 p/s", particleSpeed=1.5, bandwidth=10, latency=0.05, color="#ffa726"];
+
+  LoadBalancer -> Processor1 [label="60%", maxParticleFlow=6, particleSpeed=1.2, capacity=60, color="#66bb6a"];
+  LoadBalancer -> Processor2 [label="30%", maxParticleFlow=3, particleSpeed=1.2, capacity=30, color="#ef5350"];
+  LoadBalancer -> Processor3 [label="10%", maxParticleFlow=1, particleSpeed=1.2, capacity=10, color="#ab47bc"];
+
+  Processor1 -> Cache [particleSpeed=2.0, bandwidth=20, color="#66bb6a"];
+  Processor2 -> Cache [particleSpeed=2.0, bandwidth=20, color="#ef5350"];
+  Processor3 -> Cache [particleSpeed=2.0, bandwidth=20, color="#ab47bc"];
+
+  Cache -> Archive [label="hot path", maxParticleFlow=10, particleSpeed=2.5, bandwidth=40, color="#26c6da"];
+  Cache -> Filter  [label="cold path", maxParticleFlow=4, particleSpeed=0.8, bandwidth=8, color="#ffca28", style="dashed"];
+  Filter -> Analytics [particleSpeed=1.0, bandwidth=4, color="#ffca28"];
 }`,
         is_public: true,
-        tags: ['network', 'example', 'simple'],
-        category: 'Network',
+        tags: ['showcase', 'demo', 'des', '3d', 'iot'],
+        category: 'Showcase',
         is_template: true,
-        template_category: 'Network Topology'
-      },
-      {
-        title: 'Data Pipeline Simulation',
-        description: 'Complex data processing pipeline with multiple stages',
-        dot_code: `digraph DataPipeline {
-  rankdir=TB;
-  
-  // Data Sources
-  DataSource1 [label="Raw Data\\nIngestion", capacity=1000, processing_time=0.1, node_type="source"]
-  DataSource2 [label="Stream Data\\nIngestion", capacity=500, processing_time=0.05, node_type="source"]
-  
-  // Processing Stages
-  Cleaner [label="Data Cleaner", capacity=200, processing_time=2.0, node_type="processor"]
-  Transformer [label="Transformer", capacity=150, processing_time=3.0, node_type="processor"]
-  Aggregator [label="Aggregator", capacity=100, processing_time=1.5, node_type="processor"]
-  
-  // Storage
-  DataLake [label="Data Lake", capacity=10000, processing_time=0.2, node_type="storage"]
-  DataWarehouse [label="Data Warehouse", capacity=5000, processing_time=0.5, node_type="storage"]
-  
-  // Flows
-  DataSource1 -> Cleaner [bandwidth=50, latency=0.1, data_type="raw_data"]
-  DataSource2 -> Cleaner [bandwidth=25, latency=0.1, data_type="stream_data"]
-  Cleaner -> Transformer [bandwidth=30, latency=0.2, data_type="clean_data"]
-  Transformer -> Aggregator [bandwidth=20, latency=0.2, data_type="transformed_data"]
-  Transformer -> DataLake [bandwidth=40, latency=0.1, data_type="processed_data"]
-  Aggregator -> DataWarehouse [bandwidth=15, latency=0.3, data_type="aggregated_data"]
-}`,
-        is_public: true,
-        tags: ['data', 'pipeline', 'etl', 'complex'],
-        category: 'Data Processing',
-        is_template: true,
-        template_category: 'Data Pipeline'
-      },
-      {
-        title: 'Microservices Architecture',
-        description: 'Microservices communication pattern with API gateway',
-        dot_code: `digraph Microservices {
-  rankdir=TB;
-  
-  // Client and Gateway
-  Client [label="Client App", capacity=0, processing_time=0, node_type="client"]
-  Gateway [label="API Gateway", capacity=500, processing_time=0.1, node_type="gateway"]
-  
-  // Services
-  AuthService [label="Auth Service", capacity=100, processing_time=0.5, node_type="service"]
-  UserService [label="User Service", capacity=80, processing_time=1.0, node_type="service"]
-  OrderService [label="Order Service", capacity=60, processing_time=1.5, node_type="service"]
-  PaymentService [label="Payment Service", capacity=40, processing_time=2.0, node_type="service"]
-  
-  // Databases
-  AuthDB [label="Auth DB", capacity=1000, processing_time=0.1, node_type="database"]
-  UserDB [label="User DB", capacity=1000, processing_time=0.1, node_type="database"]
-  OrderDB [label="Order DB", capacity=800, processing_time=0.2, node_type="database"]
-  PaymentDB [label="Payment DB", capacity=500, processing_time=0.3, node_type="database"]
-  
-  // Client flows
-  Client -> Gateway [bandwidth=20, latency=0.05, data_type="api_requests"]
-  
-  // Gateway to services
-  Gateway -> AuthService [bandwidth=5, latency=0.02, data_type="auth_requests"]
-  Gateway -> UserService [bandwidth=8, latency=0.02, data_type="user_requests"]
-  Gateway -> OrderService [bandwidth=6, latency=0.02, data_type="order_requests"]
-  Gateway -> PaymentService [bandwidth=3, latency=0.02, data_type="payment_requests"]
-  
-  // Service to database flows
-  AuthService -> AuthDB [bandwidth=5, latency=0.01, data_type="auth_queries"]
-  UserService -> UserDB [bandwidth=8, latency=0.01, data_type="user_queries"]
-  OrderService -> OrderDB [bandwidth=6, latency=0.01, data_type="order_queries"]
-  PaymentService -> PaymentDB [bandwidth=3, latency=0.01, data_type="payment_queries"]
-  
-  // Inter-service communication
-  OrderService -> UserService [bandwidth=2, latency=0.05, data_type="user_validation"]
-  OrderService -> PaymentService [bandwidth=2, latency=0.05, data_type="payment_processing"]
-}`,
-        is_public: true,
-        tags: ['microservices', 'architecture', 'api', 'distributed'],
-        category: 'Architecture',
-        is_template: true,
-        template_category: 'System Architecture'
+        template_category: 'Demo'
       }
     ];
 
