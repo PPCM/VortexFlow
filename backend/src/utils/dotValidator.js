@@ -19,8 +19,14 @@ class DotValidator {
       // VortexFlow 3D extensions
       'geometry', 'dimensions', 'particleGeneration', 'maxParticleProcessing',
       'particleSpeed', 'maxParticleFlow', 'image', 'autoResize',
-      'bloomEffect', 'particlesEnabled', 'autoColors', 'defaultNodeSize'
+      'bloomEffect', 'particlesEnabled', 'autoColors', 'defaultNodeSize',
+      // DES (Discrete Event Simulation) attributes — ADR-006
+      'nodeRole', 'dropPolicy'
     ]);
+
+    // DES enums (ADR-006)
+    this.nodeRoles = new Set(['generator', 'relay', 'sink']);
+    this.dropPolicies = new Set(['tail', 'head', 'reject']);
 
     this.nodeShapes = new Set([
       // Standard DOT shapes
@@ -117,6 +123,10 @@ class DotValidator {
       const extensionResult = this.validateVortexFlowExtensions(cleanCode);
       result.metadata.hasVortexFlowExtensions = extensionResult.hasExtensions;
       result.warnings.push(...extensionResult.warnings);
+
+      // DES coherence checks (ADR-006) — cross-attribute warnings on the parsed AST
+      const coherenceResult = this.validateDESCoherence(parseResult.ast);
+      result.warnings.push(...coherenceResult.warnings);
 
       // Performance warnings
       this.addPerformanceWarnings(result);
@@ -571,7 +581,9 @@ class DotValidator {
     const vortexFlow3DAttrs = [
       'geometry', 'dimensions', 'particleGeneration', 'maxParticleProcessing',
       'particleSpeed', 'maxParticleFlow', 'image', 'autoResize',
-      'bloomEffect', 'particlesEnabled', 'autoColors', 'defaultNodeSize'
+      'bloomEffect', 'particlesEnabled', 'autoColors', 'defaultNodeSize',
+      // DES — ADR-006
+      'nodeRole', 'dropPolicy'
     ];
 
     // Check legacy attributes
@@ -710,6 +722,60 @@ class DotValidator {
             result.warnings.push(`Image path "${value}" may not be a valid image file`);
           }
           break;
+
+        case 'nodeRole':
+          if (!this.nodeRoles.has(value)) {
+            result.warnings.push(
+              `Invalid nodeRole: "${value}". Valid roles: ${Array.from(this.nodeRoles).join(', ')}`
+            );
+          }
+          break;
+
+        case 'dropPolicy':
+          if (!this.dropPolicies.has(value)) {
+            result.warnings.push(
+              `Invalid dropPolicy: "${value}". Valid policies: ${Array.from(this.dropPolicies).join(', ')}`
+            );
+          }
+          break;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Validate cross-attribute coherence for DES (ADR-006).
+   *
+   * These are warnings, not errors — the graph is still accepted, but
+   * the validator surfaces the inconsistency so the user understands why
+   * the runtime ignores a given attribute.
+   */
+  validateDESCoherence(ast) {
+    const result = { warnings: [] };
+
+    for (const node of ast.nodes) {
+      const attrs = node.attributes || {};
+      const role = attrs.nodeRole;
+      const dropPolicy = attrs.dropPolicy;
+      const queueSize = attrs.queue_size;
+      const particleGeneration = attrs.particleGeneration;
+
+      // dropPolicy without queue_size: meaningless (queue is unbounded)
+      if (dropPolicy !== undefined && queueSize === undefined) {
+        result.warnings.push(
+          `Node "${node.id}": dropPolicy="${dropPolicy}" has no effect without queue_size — the queue is unbounded and never drops.`
+        );
+      }
+
+      // particleGeneration > 0 on a non-generator role: ignored at runtime
+      if (particleGeneration !== undefined && role !== undefined && role !== 'generator') {
+        const numGen = parseFloat(particleGeneration);
+        if (!Number.isNaN(numGen) && numGen > 0) {
+          result.warnings.push(
+            `Node "${node.id}": particleGeneration=${particleGeneration} is ignored because nodeRole="${role}" (only "generator" emits).`
+          );
+        }
       }
     }
 

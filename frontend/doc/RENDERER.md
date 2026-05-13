@@ -55,6 +55,7 @@ and `simulationRunning` are true. An idle graph is static.
 
 **Why**: the default of `3d-force-graph` is to keep particles flowing forever
 once enabled, which:
+
 - burns CPU/GPU when the user isn't watching a sim,
 - visually misleads users who think a graph "is simulating" when it's just
   a screensaver.
@@ -89,6 +90,7 @@ links. A visited set prevents cycle storms (depth cap 15).
 `(1 / particleSpeed) * 16.67 ms` (one frame at 60 fps scaled by speed).
 
 **Emitter definition**:
+
 - If any node defines `particleGeneration > 0`, only those are emitters.
 - Otherwise, every node emits one particle.
 
@@ -105,6 +107,7 @@ defeat that.
 
 **What**: when no node defines `particleGeneration` / `maxParticleProcessing`,
 the simulation effect falls back to:
+
 - particle count = `scene.particles.length` (whatever 3d-force-graph happens
   to be displaying)
 - average traversal latency = derived from `particleSpeed`
@@ -138,7 +141,41 @@ write a parallel init path (e.g. for a "load template" feature).
 
 ---
 
-## 8. DOT parsing pipeline (with fallback)
+## 8.bis DES visual hooks (Phase 5)
+
+When the DES simulator owns the simulation (i.e. at least one
+`nodeRole=generator` node is declared — ADR-006), four visual behaviours
+are applied via accessor overrides:
+
+- **Queue growth on relays** — `nodeVal(node)` returns
+  `baseSize * (1 + min(1, pending/queue_size))`, capped at 2× when the
+  queue is full. Empty queue → normal size, full queue → twice as big.
+- **Saturation halo** — `nodeColor(node)` returns `#ff9800` (orange) when
+  the queue is between 80 % and 100 % full, `#d32f2f` (red) when fully
+  saturated. Overrides the user-defined `node.color`.
+- **Drop flash** — for ~200 ms after a node's `droppedCount` increments,
+  `nodeColor` returns `#ff1744` (bright red). Detected via diffing per
+  tick on `simulatorStats.queues[id].droppedCount`. The flash is short on
+  purpose so it doesn't merge into the sustained-saturation colour above.
+- **Role tint (only when no explicit `color`)** — `generator` → teal,
+  `sink` → indigo. `relay` keeps the renderer's default. Explicit DOT
+  colours are always preserved.
+
+Three module-level refs back this:
+`queueStatsByNodeRef`, `dropFlashTimeRef`, `previousDroppedCountRef`.
+They are updated by a `useEffect` listening to `simulatorStats`. The same
+effect re-installs the accessors (`fg.nodeVal(fg.nodeVal())`) so
+`3d-force-graph` re-evaluates them on every node — cheap (no layout
+rebuild), safe on large graphs.
+
+Don't read these refs from JSX directly — they are intentionally NOT
+React state because mutating them must not trigger a renderer rerender.
+A new `Drops` chip in the HUD reads from `simulatorStats` directly (which
+is React state), and is only rendered when `hasGenerators && simulatorStats`.
+
+---
+
+## 9. DOT parsing pipeline (with fallback)
 
 **Primary path**: `DotTo3DConverter.parseDotToGraphData(dotContent)` calls
 `${VITE_API_URL}/public/parse-dot` via `fetch` (currently — there's an open
@@ -189,6 +226,9 @@ Before merging a change to `GraphRenderer3D.tsx`, mentally walk through:
 - [ ] "Émission particules" emits one particle per emitter and stops (doesn't
       keep emitting).
 - [ ] Stats panel shows non-zero values on a plain DOT graph (fallback works).
+- [ ] When a graph has `nodeRole=generator`, the DES simulator drives emission,
+      relay queues grow visibly under load, drops trigger a 200 ms red flash,
+      and the HUD shows a `Drops` chip.
 - [ ] `setCurrentGraphData` is called from every init path you added.
 - [ ] Test suite still passes (`npm test -- GraphRenderer3D.test.tsx`).
 - [ ] Lint clean.

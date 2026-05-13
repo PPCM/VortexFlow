@@ -222,14 +222,25 @@ router.post('/logout',
 
 /**
  * GET /api/auth/session
- * Get current session info
+ * Probe the current session state. Always responds with HTTP 200 — the
+ * absence of a session is a legitimate state, not an error. Clients
+ * (frontend AuthContext) read `authenticated` to decide whether to
+ * surface a logged-in UI or redirect to the login page.
+ *
+ * Returning 401 here would force the frontend to console.error on every
+ * unauthenticated page load, polluting logs and dev tools without
+ * carrying real information.
  */
 router.get('/session',
-  validateSession,
   asyncHandler(async (req, res) => {
-    const user = req.user;
-
-    res.json({
+    if (!req.session || !req.session.userId) {
+      return res.json({ authenticated: false, user: null });
+    }
+    const user = await User.findByPk(req.session.userId);
+    if (!user || !user.is_active) {
+      return res.json({ authenticated: false, user: null });
+    }
+    return res.json({
       authenticated: true,
       user: {
         id: user.id,

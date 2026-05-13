@@ -173,8 +173,8 @@ describe('createSampleData', () => {
     await setupModule.createSampleData();
 
     expect(Graph.create).toHaveBeenCalled();
-    // The helper hardcodes 3 sample graphs.
-    expect(Graph.create.mock.calls.length).toBeGreaterThanOrEqual(3);
+    // The helper now seeds a single "VortexFlow Showcase" demo graph.
+    expect(Graph.create.mock.calls.length).toBeGreaterThanOrEqual(1);
   });
 
   test('swallows errors instead of throwing (sample data is optional)', async () => {

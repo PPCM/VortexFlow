@@ -17,13 +17,14 @@ We use a lightweight MADR-inspired format:
 
 ## Index
 
-| # | Title | Status |
-|---|---|---|
-| [001](./001-redis-session-store.md) | Use Redis-backed `express-session` instead of JWTs | Accepted |
-| [002](./002-browser-side-simulation.md) | Run particle simulation entirely in the browser | Accepted |
-| [003](./003-vite-over-cra.md) | Migrate frontend build from CRA to Vite | Accepted |
-| [004](./004-sequelize-sync-vs-migrations.md) | Use `sequelize.sync({alter})` in dev; migrations as a planned remediation | Transitional |
-| [005](./005-dot-3d-triple-invariant.md) | DOT 3D extensions live in three places that must stay in sync | Accepted |
+| #                                                  | Title                                                                     | Status       |
+| -------------------------------------------------- | ------------------------------------------------------------------------- | ------------ |
+| [001](./001-redis-session-store.md)                | Use Redis-backed `express-session` instead of JWTs                        | Accepted     |
+| [002](./002-browser-side-simulation.md)            | Run particle simulation entirely in the browser                           | Accepted     |
+| [003](./003-vite-over-cra.md)                      | Migrate frontend build from CRA to Vite                                   | Accepted     |
+| [004](./004-sequelize-sync-vs-migrations.md)       | Use `sequelize.sync({alter})` in dev; migrations as a planned remediation | Transitional |
+| [005](./005-dot-3d-triple-invariant.md)            | DOT 3D extensions live in three places that must stay in sync             | Accepted     |
+| [006](./006-particle-discrete-event-simulation.md) | Particle simulation moves from continuous animation to DES                | Accepted     |
 
 ## Writing a new ADR
 

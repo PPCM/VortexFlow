@@ -121,7 +121,8 @@ const DOT = 'digraph G { A -> B; B -> C; A -> C; }';
 // Stub the global fetch so that path returns a deterministic graph.
 const SAMPLE_PARSE = {
   nodes: [
-    { id: 'A', name: 'A', particleGeneration: 5, maxParticleProcessing: 3 },
+    // A is the lone generator (ADR-006 V1 strict: only nodeRole=generator emits).
+    { id: 'A', name: 'A', nodeRole: 'generator', particleGeneration: 5, maxParticleProcessing: 3 },
     { id: 'B', name: 'B' },
     { id: 'C', name: 'C' },
   ],
@@ -204,16 +205,20 @@ describe('GraphRenderer3D — particles gated by simulationRunning', () => {
     expect(cb({ name: 'a-b' })).toBe(0);
   });
 
-  test('linkDirectionalParticles emits >0 once the simulation is running', async () => {
+  test('linkDirectionalParticles still returns 0 when running with generators (DES mode)', async () => {
+    // With at least one nodeRole=generator (SAMPLE_PARSE), the DES simulator
+    // owns emission and the continuous-flow fallback stays disabled even
+    // while the simulation is running. The simulator calls emitParticle
+    // directly through onParticleReleased — checked in a separate test.
     const { rerender } = render(<GraphRenderer3D dotContent={DOT} isValid isSimulationRunning={false} />);
     await advancePastInit();
 
     rerender(<GraphRenderer3D dotContent={DOT} isValid isSimulationRunning />);
-    // After the prop flips, updateParticleProperties re-runs — wait for the
-    // callback to be reinstalled with the new behaviour.
+    // Give updateParticleProperties one render to reinstall the callback.
     await waitFor(() => {
-      expect(fgState.callbacks.linkDirectionalParticles({ name: 'a-b' })).toBeGreaterThan(0);
+      expect(fgState.callbacks.linkDirectionalParticles).toBeDefined();
     });
+    expect(fgState.callbacks.linkDirectionalParticles({ name: 'a-b' })).toBe(0);
   });
 });
 
@@ -236,39 +241,6 @@ describe('GraphRenderer3D — Émission particules (one-shot trace)', () => {
     fgState.emitParticleCalls.length = 0;
     act(() => { fireEvent.click(btn); });
     expect(fgState.emitParticleCalls.length).toBe(2);
-  });
-});
-
-// ----------------------------------------------------------------------------
-// Toolbar / panel sync
-// ----------------------------------------------------------------------------
-describe('GraphRenderer3D — Start Simulation button delegates to onToggleSimulation', () => {
-  test('clicking Start Simulation in the rail calls the parent toggle', async () => {
-    const onToggle = vi.fn();
-    render(
-      <GraphRenderer3D
-        dotContent={DOT}
-        isValid
-        isSimulationRunning={false}
-        onToggleSimulation={onToggle}
-      />,
-    );
-    await advancePastInit();
-
-    const btn = screen.getByLabelText(/Start Simulation/i);
-    fireEvent.click(btn);
-
-    expect(onToggle).toHaveBeenCalledTimes(1);
-  });
-
-  test('falls back to a local toggle if no parent callback is provided', async () => {
-    render(<GraphRenderer3D dotContent={DOT} isValid isSimulationRunning={false} />);
-    await advancePastInit();
-
-    const btn = screen.getByLabelText(/Start Simulation/i);
-    fireEvent.click(btn);
-    // Local fallback flips the flag → label should switch to "Pause Simulation".
-    await screen.findByLabelText(/Pause Simulation/i);
   });
 });
 

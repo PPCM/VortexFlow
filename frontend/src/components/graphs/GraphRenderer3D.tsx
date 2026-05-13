@@ -19,14 +19,13 @@ import {
   Label as LabelIcon,
   TextFields as TextFieldsIcon,
   FlashOn as FlashOnIcon,
-  PlayArrow as PlayArrowIcon,
-  Pause as PauseIcon,
   Tune as TuneIcon,
 } from '@mui/icons-material';
 import ForceGraph3D from '3d-force-graph';
 import * as THREE from 'three';
 import SpriteText from 'three-spritetext';
 import { GraphData } from '../../types';
+import { useParticleSimulator } from '../../hooks/useParticleSimulator';
 
 // Déclaration de type pour THREE.js global
 declare global {
@@ -45,10 +44,6 @@ interface GraphRenderer3DProps {
   // Drives the in-renderer simulation: when true, particles emit along links
   // and the per-node accumulation / stats effect runs.
   isSimulationRunning?: boolean;
-  // Optional toggle handler: when provided, the panel's Start/Pause button
-  // delegates to the parent (GraphViewer) instead of flipping a local flag,
-  // so the toolbar icon and the panel button stay in sync.
-  onToggleSimulation?: () => void;
 }
 
 // Types pour la gestion des données 3D étendues
@@ -69,6 +64,12 @@ interface ForceGraphNode {
   image?: string;
   autoResize?: boolean;
   bloomEffect?: boolean;
+  // DES attributes (ADR-006) — consumed by ParticleSimulator
+  nodeRole?: 'generator' | 'relay' | 'sink';
+  dropPolicy?: 'tail' | 'head' | 'reject';
+  queue_size?: number;
+  processing_time?: number;
+  failure_rate?: number;
 }
 
 interface ForceGraphLink {
@@ -243,6 +244,16 @@ export class DotTo3DConverter {
         color: attrs.color
       });
       
+      const validRoles: Array<NonNullable<ForceGraphNode['nodeRole']>> = [
+        'generator',
+        'relay',
+        'sink',
+      ];
+      const validDropPolicies: Array<NonNullable<ForceGraphNode['dropPolicy']>> = [
+        'tail',
+        'head',
+        'reject',
+      ];
       const node: ForceGraphNode = {
         id: nodeId,
         name: attrs.name || attrs.label || nodeId,
@@ -252,11 +263,23 @@ export class DotTo3DConverter {
         // Extensions 3D pour les nœuds
         geometry: this.parseGeometry(attrs.geometry),
         dimensions: this.parseDimensions(attrs.dimensions),
-        particleGeneration: attrs.particleGeneration ? parseInt(attrs.particleGeneration) : undefined,
-        maxParticleProcessing: attrs.maxParticleProcessing ? parseInt(attrs.maxParticleProcessing) : undefined,
+        particleGeneration: attrs.particleGeneration ? parseFloat(attrs.particleGeneration) : undefined,
+        maxParticleProcessing: attrs.maxParticleProcessing
+          ? parseFloat(attrs.maxParticleProcessing)
+          : undefined,
         image: attrs.image,
         autoResize: attrs.autoResize ? this.parseBoolean(attrs.autoResize) : undefined,
-        bloomEffect: attrs.bloomEffect ? this.parseBoolean(attrs.bloomEffect) : undefined
+        bloomEffect: attrs.bloomEffect ? this.parseBoolean(attrs.bloomEffect) : undefined,
+        // DES attributes (ADR-006)
+        nodeRole: validRoles.includes(attrs.nodeRole as any)
+          ? (attrs.nodeRole as ForceGraphNode['nodeRole'])
+          : undefined,
+        dropPolicy: validDropPolicies.includes(attrs.dropPolicy as any)
+          ? (attrs.dropPolicy as ForceGraphNode['dropPolicy'])
+          : undefined,
+        queue_size: attrs.queue_size ? parseInt(attrs.queue_size, 10) : undefined,
+        processing_time: attrs.processing_time ? parseFloat(attrs.processing_time) : undefined,
+        failure_rate: attrs.failure_rate ? parseFloat(attrs.failure_rate) : undefined,
       };
       
       console.log(`✅ Nœud ${nodeId} final:`, node);
@@ -362,19 +385,42 @@ export class DotTo3DConverter {
     // Convertir les nœuds du backend
     if (backendData.nodes) {
       for (const node of backendData.nodes) {
+        // DES attributes pass through as numbers/strings — the simulator
+        // applies its own defaults if undefined.
+        const validRoles: Array<NonNullable<ForceGraphNode['nodeRole']>> = [
+          'generator',
+          'relay',
+          'sink',
+        ];
+        const validDropPolicies: Array<NonNullable<ForceGraphNode['dropPolicy']>> = [
+          'tail',
+          'head',
+          'reject',
+        ];
+        const nodeRole = validRoles.includes(node.nodeRole) ? node.nodeRole : undefined;
+        const dropPolicy = validDropPolicies.includes(node.dropPolicy) ? node.dropPolicy : undefined;
         nodes.push({
           id: node.id,
           name: node.label || node.name || node.id,
           group: 1,
           val: parseFloat(node.size || '8'),
-          color: node.color || '#1976D2',
+          // Preserve "user did not specify" by keeping color undefined here.
+          // The renderer's nodeColor accessor falls back to a default after
+          // checking for drop flash, saturation halo and role tint in order.
+          color: node.color,
           geometry: this.parseGeometry(node.geometry),
           dimensions: this.parseDimensions(node.dimensions),
-          particleGeneration: node.particleGeneration ? parseInt(node.particleGeneration) : undefined,
-          maxParticleProcessing: node.maxParticleProcessing ? parseInt(node.maxParticleProcessing) : undefined,
+          particleGeneration: node.particleGeneration ? parseFloat(node.particleGeneration) : undefined,
+          maxParticleProcessing: node.maxParticleProcessing ? parseFloat(node.maxParticleProcessing) : undefined,
           image: node.image,
           autoResize: node.autoResize ? this.parseBoolean(node.autoResize) : undefined,
-          bloomEffect: node.bloomEffect ? this.parseBoolean(node.bloomEffect) : undefined
+          bloomEffect: node.bloomEffect ? this.parseBoolean(node.bloomEffect) : undefined,
+          // DES attributes (ADR-006)
+          nodeRole,
+          dropPolicy,
+          queue_size: node.queue_size ? parseInt(node.queue_size, 10) : undefined,
+          processing_time: node.processing_time ? parseFloat(node.processing_time) : undefined,
+          failure_rate: node.failure_rate ? parseFloat(node.failure_rate) : undefined,
         });
       }
     }
@@ -386,7 +432,7 @@ export class DotTo3DConverter {
           source: link.source,
           target: link.target,
           name: link.label || '',
-          color: link.color || '#888',
+          color: link.color,
           maxParticleFlow: link.maxParticleFlow ? parseInt(link.maxParticleFlow) : undefined,
           particleSpeed: link.particleSpeed ? parseFloat(link.particleSpeed) : undefined,
           style: link.style as 'solid' | 'dashed' | 'dotted' || 'solid'
@@ -510,7 +556,6 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   isValid,
   parsedData: _parsedData,
   isSimulationRunning,
-  onToggleSimulation,
 }) => {
   const graphRef = useRef<HTMLDivElement>(null);
   const forceGraphRef = useRef<any>(null);
@@ -540,7 +585,10 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   const [simulationStats, setSimulationStats] = useState({
     totalParticles: 0,
     averageLatency: 0,
-    bottleneckNodes: 0
+    bottleneckNodes: 0,
+    // Phase 6 — session-scoped DES metrics. Reset on simulator (re)start.
+    maxQueueSize: 0,
+    throughputPerSec: 0,
   });
 
   // Mirror the global simulation state (driven by the toolbar) into the
@@ -555,6 +603,168 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
   // État pour stocker les données du graphique
   const [currentGraphData, setCurrentGraphData] = useState<{nodes: ForceGraphNode[], links: ForceGraphLink[]}>({nodes: [], links: []});
+
+  // DES particle simulator (ADR-006). The hook owns the simulator instance,
+  // drives it via rAF, and surfaces stats via React state. We wire its
+  // `onParticleReleased` to `emitParticle` on the 3d-force-graph instance so
+  // each logical release produces a visible animation.
+  const onSimulatorParticleReleased = useCallback((linkId: string) => {
+    const fg = forceGraphRef.current;
+    if (!fg || typeof fg.emitParticle !== 'function') return;
+    // The simulator generates link ids as "<source>-><target>#<counter>".
+    // Resolve back to the link object in the live graph to call emitParticle.
+    const data = fg.graphData();
+    if (!data?.links?.length) return;
+    const match = linkId.match(/^(.+)->(.+?)#\d+$/);
+    if (!match) return;
+    const [, source, target] = match;
+    const link = data.links.find((l: any) => {
+      const sId = typeof l.source === 'object' ? l.source.id : l.source;
+      const tId = typeof l.target === 'object' ? l.target.id : l.target;
+      return sId === source && tId === target;
+    });
+    if (link) fg.emitParticle(link);
+  }, []);
+
+  const { stats: simulatorStats, hasGenerators } = useParticleSimulator({
+    graphData: currentGraphData,
+    isRunning: simulationRunning,
+    onParticleReleased: onSimulatorParticleReleased,
+  });
+
+  // Visualisation refs (Phase 5).
+  //
+  // The nodeVal / nodeColor accessors read these refs at render time. We
+  // update them on every simulator tick — without forcing a React rerender
+  // of the whole component (which would be wasteful) — and then ping the
+  // force graph to re-evaluate its accessors.
+  //
+  // queueStatsByNode  : current queue size + cumulative drops, keyed by node id
+  // dropFlashTime     : timestamp (performance.now ms) of the last detected drop
+  //                     for that node. Used to colour the node red for ~200ms
+  //                     after each drop event.
+  // previousDroppedCount : last-seen droppedCount per node, used to detect
+  //                     "a new drop happened" by diffing against the current snapshot.
+  const queueStatsByNodeRef = useRef<Map<string, { size: number; droppedCount: number }>>(
+    new Map()
+  );
+  const dropFlashTimeRef = useRef<Map<string, number>>(new Map());
+  const previousDroppedCountRef = useRef<Map<string, number>>(new Map());
+  // Phase 6 — session-scoped HUD metrics.
+  // maxQueueSeenRef: highest pending count observed across all relays since
+  //   the last start(). Reset on start.
+  // throughputSamplesRef: sliding window of (time, totalEmitted) samples used
+  //   to compute particles/sec. Trimmed to the last 2 seconds.
+  const maxQueueSeenRef = useRef(0);
+  const throughputSamplesRef = useRef<{ time: number; totalEmitted: number }[]>([]);
+  // Detect simulator (re)start (false→true edge on simulationRunning) to
+  // reset session-scoped refs in sync with the simulator's own start() reset.
+  const prevSimulationRunningRef = useRef(false);
+
+  // Drop flash duration in ms — kept short so it doesn't visually merge into
+  // sustained-saturation states.
+  const DROP_FLASH_MS = 200;
+
+  // Phase 5 — centralised resolvers used by both the nodeColor accessor
+  // (for default sphere meshes) AND the per-tick mutation of custom meshes
+  // built by nodeThreeObjectCallback. 3d-force-graph only re-evaluates
+  // nodeColor for its own built-in spheres; meshes returned from
+  // nodeThreeObject are created once and never re-coloured by the engine,
+  // so we mutate their material.color directly in the sync effect below.
+  //
+  // Priority: drop flash > saturation halo > role tint > user colour > fallback.
+  const resolveNodeColor = useCallback((node: any): string => {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const lastFlash = dropFlashTimeRef.current.get(node.id);
+    if (lastFlash !== undefined && now - lastFlash < DROP_FLASH_MS) {
+      return '#ff1744';
+    }
+    const qStat = queueStatsByNodeRef.current.get(node.id);
+    if (qStat && node.queue_size && node.queue_size > 0) {
+      const ratio = qStat.size / node.queue_size;
+      if (ratio >= 1) return '#d32f2f';
+      if (ratio > 0.8) return '#ff9800';
+    }
+    if (!node.color) {
+      if (node.nodeRole === 'generator') return '#80cbc4';
+      if (node.nodeRole === 'sink') return '#9fa8da';
+    }
+    return node.color || '#4fc3f7';
+  }, []);
+
+  // Scale factor applied to a node based on its queue occupancy
+  // (capped at 2×). Empty queue or no queue_size → 1.
+  const resolveNodeScale = useCallback((node: any): number => {
+    const qStat = queueStatsByNodeRef.current.get(node.id);
+    if (qStat && node.queue_size && node.queue_size > 0) {
+      const ratio = Math.min(1, qStat.size / node.queue_size);
+      return 1 + ratio;
+    }
+    return 1;
+  }, []);
+
+  // Sync visualisation refs with the simulator's stats stream and ping the
+  // force graph so it picks up the new queue sizes (node growth) and colour
+  // overrides (saturation halo, drop flash).
+  useEffect(() => {
+    if (!simulatorStats) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+    // Detect newly-arrived drops by diffing per-node droppedCount.
+    // Also track the largest queue size seen this session (Phase 6).
+    for (const [nodeId, q] of simulatorStats.queues) {
+      const prev = previousDroppedCountRef.current.get(nodeId) ?? 0;
+      if (q.droppedCount > prev) {
+        dropFlashTimeRef.current.set(nodeId, now);
+      }
+      previousDroppedCountRef.current.set(nodeId, q.droppedCount);
+      if (q.size > maxQueueSeenRef.current) {
+        maxQueueSeenRef.current = q.size;
+      }
+    }
+
+    // Phase 6 — append a throughput sample, trim to the last 2 s.
+    throughputSamplesRef.current.push({ time: now, totalEmitted: simulatorStats.totalEmitted });
+    const cutoff = now - 2000;
+    while (
+      throughputSamplesRef.current.length > 0 &&
+      throughputSamplesRef.current[0].time < cutoff
+    ) {
+      throughputSamplesRef.current.shift();
+    }
+
+    queueStatsByNodeRef.current = new Map(simulatorStats.queues);
+
+    // Update the visual state of each node's mesh directly. For nodes
+    // rendered via the engine's default sphere, the nodeColor accessor is
+    // re-evaluated by 3d-force-graph automatically — but for nodes with a
+    // custom mesh (returned from nodeThreeObject), the engine builds the
+    // mesh once and never re-colours it. So we walk `__threeObj` and mutate
+    // material.color + Group.scale directly. Cheap: at most N nodes per tick.
+    const fg = forceGraphRef.current;
+    if (fg) {
+      try {
+        const data = fg.graphData();
+        for (const node of data.nodes) {
+          const obj3d = (node as any).__threeObj;
+          if (!obj3d) continue;
+          const desiredColor = resolveNodeColor(node);
+          const desiredScale = resolveNodeScale(node);
+          obj3d.scale.setScalar(desiredScale);
+          obj3d.traverse((child: any) => {
+            if (child.isMesh && child.material && child.material.color) {
+              child.material.color.set(desiredColor);
+              if (child.material.emissive) {
+                child.material.emissive.set(desiredColor).multiplyScalar(0.05);
+              }
+            }
+          });
+        }
+      } catch {
+        /* ref is mid-init or being disposed — ignore */
+      }
+    }
+  }, [simulatorStats, resolveNodeColor, resolveNodeScale]);
 
   // First-render guard: a few downstream effects (showNodeText / showLinkText
   // reconfigure) run only after init completes. Flip the flag once dimensions
@@ -682,10 +892,13 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       // Opaque material — transparent meshes don't write to the depth buffer,
       // which made faces flicker / vanish when rotating. DoubleSide also avoids
       // backface culling artifacts on torus / cone interiors.
+      // Initial colour uses the same resolver as the per-tick mutation in the
+      // simulator-stats sync effect, so role tints apply from the first frame.
+      const initialColor = resolveNodeColor(node);
       material = new THREE.MeshLambertMaterial({
-        color: node.color || '#4fc3f7',
+        color: initialColor,
         side: THREE.DoubleSide,
-        emissive: node.bloomEffect ? new THREE.Color(node.color || '#4fc3f7').multiplyScalar(0.1) : 0x000000
+        emissive: node.bloomEffect ? new THREE.Color(initialColor).multiplyScalar(0.1) : 0x000000
       });
       
       const mesh = new THREE.Mesh(geometry, material);
@@ -745,7 +958,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       console.error('Erreur lors de la création de la géométrie 3D:', error);
       return undefined;
     }
-  }, [showNodeText]);
+  }, [showNodeText, resolveNodeColor]);
 
   // Effet pour redimensionner le graphique 3D quand les dimensions changent
   useEffect(() => {
@@ -771,12 +984,18 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
   const updateParticleProperties = useCallback(() => {
     if (!forceGraphRef.current) return;
-    
+
     forceGraphRef.current
       // Particles only emit while a simulation is running. Outside of that,
       // every link reports 0 so nothing flows on idle graphs.
+      //
+      // When the DES simulator owns emission (hasGenerators === true), this
+      // returns 0 — the simulator's onParticleReleased drives emitParticle()
+      // explicitly. We keep the legacy continuous flow only as a fallback
+      // for graphs that don't declare nodeRole=generator anywhere.
       .linkDirectionalParticles((link: any) => {
         if (!showParticles || !simulationRunning) return 0;
+        if (hasGenerators) return 0;
         if (link.maxParticleFlow && link.maxParticleFlow > 0) {
           return Math.max(1, Math.min(10, Math.floor(link.maxParticleFlow / 20)));
         }
@@ -805,11 +1024,15 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       // link.color here: dark link colors (and unlit Lambert fallbacks) made
       // particles render almost black, masking labels behind them.
       .linkDirectionalParticleColor(() => '#ffd54f');
-  }, [showParticles, simulationRunning]);
+  }, [showParticles, simulationRunning, hasGenerators]);
 
-  // Simulation temps réel des accumulations
+  // Simulation temps réel des accumulations (fallback heuristique).
+  // Désactivé quand le DES simulator est en charge (hasGenerators=true) :
+  // dans ce cas, les stats viennent directement de simulatorStats via
+  // l'effect ci-dessous.
   useEffect(() => {
     if (!simulationRunning || !currentGraphData?.nodes) return;
+    if (hasGenerators) return;
     
     // Track in-degree and link traversal time so that even DOT graphs without
     // VortexFlow attributes get meaningful stats once the sim is running.
@@ -880,23 +1103,71 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
         forceGraphRef.current.nodeVal(undefined);
       }
     }, 100);
-    
+
     return () => clearInterval(interval);
-  }, [simulationRunning, currentGraphData, nodeAccumulation]);
+  }, [simulationRunning, currentGraphData, nodeAccumulation, hasGenerators]);
+
+  // Branch real-time stats from the DES simulator into simulationStats so the
+  // existing HUD doesn't need to change shape. Only active when the simulator
+  // is in charge (hasGenerators === true); otherwise the heuristic effect
+  // above continues to populate simulationStats.
+  useEffect(() => {
+    if (!hasGenerators || !simulatorStats) return;
+    // Count "bottleneck" nodes as those with a non-trivial queue size.
+    let bottleneckCount = 0;
+    for (const q of simulatorStats.queues.values()) {
+      if (q.size > 5) bottleneckCount++;
+    }
+    // Phase 6 — instantaneous throughput from the sliding window.
+    let throughputPerSec = 0;
+    const samples = throughputSamplesRef.current;
+    if (samples.length >= 2) {
+      const first = samples[0];
+      const last = samples[samples.length - 1];
+      const dtMs = last.time - first.time;
+      if (dtMs > 0) {
+        throughputPerSec = Math.round(((last.totalEmitted - first.totalEmitted) / dtMs) * 1000);
+      }
+    }
+    setSimulationStats({
+      totalParticles: simulatorStats.particlesInFlight,
+      averageLatency: Number.isNaN(simulatorStats.averageLatencyMs)
+        ? 0
+        : Math.round(simulatorStats.averageLatencyMs),
+      bottleneckNodes: bottleneckCount,
+      maxQueueSize: maxQueueSeenRef.current,
+      throughputPerSec,
+    });
+  }, [hasGenerators, simulatorStats]);
+
+  // Reset session-scoped HUD refs on simulator (re)start. We mirror the
+  // simulator's own reset-on-start contract (D5) so the HUD doesn't carry
+  // stale data across runs.
+  useEffect(() => {
+    if (simulationRunning && !prevSimulationRunningRef.current) {
+      maxQueueSeenRef.current = 0;
+      throughputSamplesRef.current = [];
+      previousDroppedCountRef.current.clear();
+      dropFlashTimeRef.current.clear();
+    }
+    prevSimulationRunningRef.current = simulationRunning;
+  }, [simulationRunning]);
 
   // One-shot trace: send a single particle from every emitter node and let it
   // cascade through outgoing links so the user can follow the path without
   // particles accumulating. Cycles are short-circuited by a visited set.
+  //
+  // V1 stricte (ADR-006): seuls les nœuds nodeRole=generator émettent. Plus
+  // de fallback "tout émetteur" basé sur particleGeneration > 0 — la règle
+  // est désormais purement basée sur le rôle. Si aucun nœud n'est generator,
+  // le bouton ne fait rien (le UI le signale via hasGenerators).
   const handleEmitTrace = useCallback(() => {
     const fg = forceGraphRef.current;
     if (!fg || typeof fg.emitParticle !== 'function') return;
     const data = fg.graphData();
     if (!data?.nodes?.length) return;
 
-    const hasVortexEmitters = data.nodes.some((n: any) => n.particleGeneration > 0);
-    const isEmitter = (node: any) => (
-      hasVortexEmitters ? (node.particleGeneration || 0) > 0 : true
-    );
+    const isEmitter = (node: any) => node.nodeRole === 'generator';
 
     const visited = new Set<string>();
     const fireFrom = (nodeId: string, depth: number) => {
@@ -1138,20 +1409,29 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
         // Configuration avancée des nœuds avec support des géométries 3D
         graph
-          .nodeLabel(() => '') 
+          .nodeLabel(() => '')
           .nodeVal((node: any) => {
             if (node.geometry) {
-              return 0; 
+              return 0;
             }
-            
+
             let baseSize = nodeSize;
             if (node.particleGeneration) {
               baseSize = Math.max(4, Math.min(12, 4 + node.particleGeneration / 50));
             }
-            
+
+            // Phase 5 — queue growth. When the DES simulator is in charge
+            // and the node has a defined queue_size, scale up the node
+            // proportionally to its fill ratio (1× empty → 2× full).
+            const qStat = queueStatsByNodeRef.current.get(node.id);
+            if (qStat && node.queue_size && node.queue_size > 0) {
+              const ratio = Math.min(1, qStat.size / node.queue_size);
+              return baseSize * (1 + ratio);
+            }
+
             return baseSize;
           })
-          .nodeColor((node: any) => node.color || '#4fc3f7')
+          .nodeColor((node: any) => resolveNodeColor(node))
           .nodeThreeObject(nodeThreeObjectCallback)
           .linkLabel((link: any) => showLinkText && link.name ? link.name : '')
           .linkThreeObjectExtend(true)
@@ -1202,6 +1482,10 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           })
           .linkDirectionalParticles((link: any) => {
             if (!showParticles || !simulationRunning) return 0;
+            // DES simulator owns emission when at least one generator is
+            // declared (ADR-006). Continuous flow is a fallback for
+            // un-annotated graphs.
+            if (hasGenerators) return 0;
             if (link.maxParticleFlow) {
               return Math.min(8, Math.max(1, Math.floor(link.maxParticleFlow / 10)));
             }
@@ -1420,18 +1704,82 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
           <>
             <Box sx={{ width: 1, background: 'rgba(255, 255, 255, 0.08)' }} />
             {[
-              { k: 'Particules', v: simulationStats.totalParticles, color: 'success.main' },
-              { k: 'Latence', v: `${simulationStats.averageLatency} ms`, color: 'info.main' },
-              { k: 'Goulots', v: simulationStats.bottleneckNodes, color: 'error.main' },
+              {
+                k: 'Particules',
+                v: simulationStats.totalParticles,
+                color: 'success.main',
+                tip: 'Particules actuellement en transit sur les liens.',
+              },
+              {
+                k: 'Latence',
+                v: `${simulationStats.averageLatency} ms`,
+                color: 'info.main',
+                tip: 'Latence moyenne d\'une particule depuis l\'émission jusqu\'à l\'arrivée à un sink.',
+              },
+              {
+                k: 'Goulots',
+                v: simulationStats.bottleneckNodes,
+                color: 'error.main',
+                tip: 'Nœuds avec plus de 5 particules en file d\'attente — signale une accumulation.',
+              },
+              // Phase 5 — drops surface only when the DES simulator is in
+              // charge. Heuristic mode (no generators) has no notion of drop.
+              // Phase 6 — File max + Débit instantané (DES-only too).
+              ...(hasGenerators && simulatorStats
+                ? [
+                    {
+                      k: 'Drops',
+                      v: simulatorStats.totalDropped,
+                      color: 'error.main',
+                      tip: 'Cumul des particules droppées (queue pleine, failure_rate, no_outlet).',
+                    },
+                    {
+                      k: 'File max',
+                      v: simulationStats.maxQueueSize,
+                      color: 'warning.main',
+                      tip: 'Plus grande file constatée depuis le démarrage de la simulation.',
+                    },
+                    {
+                      k: 'Débit',
+                      v: `${simulationStats.throughputPerSec}/s`,
+                      color: 'info.main',
+                      tip: 'Débit instantané (particules/seconde) sur les 2 dernières secondes.',
+                    },
+                  ]
+                : []),
             ].map((s) => (
-              <Box key={s.k} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 38 }}>
-                <Typography sx={{ fontSize: 10, letterSpacing: 0.4, textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
-                  {s.k}
-                </Typography>
-                <Typography sx={{ fontFamily: 'ui-monospace, monospace', fontWeight: 600, fontSize: 16, color: s.color }}>
-                  {s.v}
-                </Typography>
-              </Box>
+              <Tooltip key={s.k} title={s.tip ?? ''} placement="bottom" arrow>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    minWidth: 38,
+                    cursor: s.tip ? 'help' : 'default',
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: 10,
+                      letterSpacing: 0.4,
+                      textTransform: 'uppercase',
+                      color: 'rgba(255,255,255,0.5)',
+                    }}
+                  >
+                    {s.k}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontFamily: 'ui-monospace, monospace',
+                      fontWeight: 600,
+                      fontSize: 16,
+                      color: s.color,
+                    }}
+                  >
+                    {s.v}
+                  </Typography>
+                </Box>
+              </Tooltip>
             ))}
           </>
         )}
