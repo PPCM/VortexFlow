@@ -198,10 +198,23 @@ describe('POST /api/auth/logout', () => {
 // GET /api/auth/session
 // ----------------------------------------------------------------------------
 describe('GET /api/auth/session', () => {
-  test('401 without session', async () => {
+  test('200 with authenticated=false when there is no session', async () => {
+    // The probe must NOT 401: the frontend hits it on every public page
+    // load (login/register) and we don't want a console error on those.
     const app = buildTestApp(authRoutes, '/api/auth', { session: null });
     const res = await request(app).get('/api/auth/session');
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ authenticated: false, user: null });
+  });
+
+  test('200 with authenticated=false when the user is inactive', async () => {
+    mockFindByPk.mockResolvedValue({ ...makeUser(), is_active: false });
+    const app = buildTestApp(authRoutes, '/api/auth', {
+      session: { userId: 'user-1' },
+    });
+    const res = await request(app).get('/api/auth/session');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ authenticated: false, user: null });
   });
 
   test('200 with the current user payload when authenticated', async () => {
