@@ -183,7 +183,10 @@ router.post('/parse-dot',
         label: node.attributes.label || node.id,
         name: node.attributes.label || node.id,
         size: node.attributes.val || node.attributes.size || '8',
-        color: node.attributes.color || '#1976D2',
+        // Pass color through only when the user actually specified it in DOT.
+        // The frontend applies a default (and role-based tint for DES graphs),
+        // so we must not paper over the user's intent here.
+        color: node.attributes.color,
         geometry: node.attributes.geometry,
         dimensions: node.attributes.dimensions,
         particleGeneration: node.attributes.particleGeneration,
@@ -198,12 +201,13 @@ router.post('/parse-dot',
         processing_time: node.attributes.processing_time,
         failure_rate: node.attributes.failure_rate
       }));
-      
+
       const links = parseResult.ast.edges.map(edge => ({
         source: edge.from,
         target: edge.to,
         label: edge.attributes.label || '',
-        color: edge.attributes.color || '#888',
+        // Same reasoning as for node.color: pass through only when set.
+        color: edge.attributes.color,
         maxParticleFlow: edge.attributes.maxParticleFlow,
         particleSpeed: edge.attributes.particleSpeed,
         style: edge.attributes.style || 'solid'

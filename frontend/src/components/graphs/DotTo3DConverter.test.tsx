@@ -222,9 +222,10 @@ describe('convertBackendDataToGraph', () => {
     expect(r.nodes[0]).toEqual(expect.objectContaining({
       id: 'A', name: 'Alpha', val: 10, color: '#ff0000', geometry: '3d-sphere',
     }));
-    // Defaults applied where backend omits values.
+    // Backend-omitted color stays undefined so the renderer's nodeColor
+    // accessor can apply role tints (ADR-006) before falling back to a default.
     expect(r.nodes[1]).toEqual(expect.objectContaining({
-      id: 'B', name: 'Beta', color: '#1976D2',
+      id: 'B', name: 'Beta', color: undefined,
     }));
     expect(r.links[0]).toEqual(expect.objectContaining({
       source: 'A', target: 'B', name: 'link', color: '#00ff00', style: 'dashed',

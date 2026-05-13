@@ -404,7 +404,10 @@ export class DotTo3DConverter {
           name: node.label || node.name || node.id,
           group: 1,
           val: parseFloat(node.size || '8'),
-          color: node.color || '#1976D2',
+          // Preserve "user did not specify" by keeping color undefined here.
+          // The renderer's nodeColor accessor falls back to a default after
+          // checking for drop flash, saturation halo and role tint in order.
+          color: node.color,
           geometry: this.parseGeometry(node.geometry),
           dimensions: this.parseDimensions(node.dimensions),
           particleGeneration: node.particleGeneration ? parseFloat(node.particleGeneration) : undefined,
@@ -429,7 +432,7 @@ export class DotTo3DConverter {
           source: link.source,
           target: link.target,
           name: link.label || '',
-          color: link.color || '#888',
+          color: link.color,
           maxParticleFlow: link.maxParticleFlow ? parseInt(link.maxParticleFlow) : undefined,
           particleSpeed: link.particleSpeed ? parseFloat(link.particleSpeed) : undefined,
           style: link.style as 'solid' | 'dashed' | 'dotted' || 'solid'
@@ -662,6 +665,44 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
   // sustained-saturation states.
   const DROP_FLASH_MS = 200;
 
+  // Phase 5 — centralised resolvers used by both the nodeColor accessor
+  // (for default sphere meshes) AND the per-tick mutation of custom meshes
+  // built by nodeThreeObjectCallback. 3d-force-graph only re-evaluates
+  // nodeColor for its own built-in spheres; meshes returned from
+  // nodeThreeObject are created once and never re-coloured by the engine,
+  // so we mutate their material.color directly in the sync effect below.
+  //
+  // Priority: drop flash > saturation halo > role tint > user colour > fallback.
+  const resolveNodeColor = useCallback((node: any): string => {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const lastFlash = dropFlashTimeRef.current.get(node.id);
+    if (lastFlash !== undefined && now - lastFlash < DROP_FLASH_MS) {
+      return '#ff1744';
+    }
+    const qStat = queueStatsByNodeRef.current.get(node.id);
+    if (qStat && node.queue_size && node.queue_size > 0) {
+      const ratio = qStat.size / node.queue_size;
+      if (ratio >= 1) return '#d32f2f';
+      if (ratio > 0.8) return '#ff9800';
+    }
+    if (!node.color) {
+      if (node.nodeRole === 'generator') return '#80cbc4';
+      if (node.nodeRole === 'sink') return '#9fa8da';
+    }
+    return node.color || '#4fc3f7';
+  }, []);
+
+  // Scale factor applied to a node based on its queue occupancy
+  // (capped at 2×). Empty queue or no queue_size → 1.
+  const resolveNodeScale = useCallback((node: any): number => {
+    const qStat = queueStatsByNodeRef.current.get(node.id);
+    if (qStat && node.queue_size && node.queue_size > 0) {
+      const ratio = Math.min(1, qStat.size / node.queue_size);
+      return 1 + ratio;
+    }
+    return 1;
+  }, []);
+
   // Sync visualisation refs with the simulator's stats stream and ping the
   // force graph so it picks up the new queue sizes (node growth) and colour
   // overrides (saturation halo, drop flash).
@@ -694,20 +735,36 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
     queueStatsByNodeRef.current = new Map(simulatorStats.queues);
 
-    // Re-evaluate the accessors so the node sizes / colours update on screen.
-    // Calling .nodeVal(.nodeVal()) is the documented way to force 3d-force-graph
-    // to re-run the accessor on every node — cheap (no layout), safe on large
-    // graphs because it does not rebuild the scene.
+    // Update the visual state of each node's mesh directly. For nodes
+    // rendered via the engine's default sphere, the nodeColor accessor is
+    // re-evaluated by 3d-force-graph automatically — but for nodes with a
+    // custom mesh (returned from nodeThreeObject), the engine builds the
+    // mesh once and never re-colours it. So we walk `__threeObj` and mutate
+    // material.color + Group.scale directly. Cheap: at most N nodes per tick.
     const fg = forceGraphRef.current;
-    if (fg && typeof fg.nodeVal === 'function') {
+    if (fg) {
       try {
-        fg.nodeVal(fg.nodeVal());
-        fg.nodeColor(fg.nodeColor());
+        const data = fg.graphData();
+        for (const node of data.nodes) {
+          const obj3d = (node as any).__threeObj;
+          if (!obj3d) continue;
+          const desiredColor = resolveNodeColor(node);
+          const desiredScale = resolveNodeScale(node);
+          obj3d.scale.setScalar(desiredScale);
+          obj3d.traverse((child: any) => {
+            if (child.isMesh && child.material && child.material.color) {
+              child.material.color.set(desiredColor);
+              if (child.material.emissive) {
+                child.material.emissive.set(desiredColor).multiplyScalar(0.05);
+              }
+            }
+          });
+        }
       } catch {
         /* ref is mid-init or being disposed — ignore */
       }
     }
-  }, [simulatorStats]);
+  }, [simulatorStats, resolveNodeColor, resolveNodeScale]);
 
   // First-render guard: a few downstream effects (showNodeText / showLinkText
   // reconfigure) run only after init completes. Flip the flag once dimensions
@@ -835,10 +892,13 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       // Opaque material — transparent meshes don't write to the depth buffer,
       // which made faces flicker / vanish when rotating. DoubleSide also avoids
       // backface culling artifacts on torus / cone interiors.
+      // Initial colour uses the same resolver as the per-tick mutation in the
+      // simulator-stats sync effect, so role tints apply from the first frame.
+      const initialColor = resolveNodeColor(node);
       material = new THREE.MeshLambertMaterial({
-        color: node.color || '#4fc3f7',
+        color: initialColor,
         side: THREE.DoubleSide,
-        emissive: node.bloomEffect ? new THREE.Color(node.color || '#4fc3f7').multiplyScalar(0.1) : 0x000000
+        emissive: node.bloomEffect ? new THREE.Color(initialColor).multiplyScalar(0.1) : 0x000000
       });
       
       const mesh = new THREE.Mesh(geometry, material);
@@ -898,7 +958,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
       console.error('Erreur lors de la création de la géométrie 3D:', error);
       return undefined;
     }
-  }, [showNodeText]);
+  }, [showNodeText, resolveNodeColor]);
 
   // Effet pour redimensionner le graphique 3D quand les dimensions changent
   useEffect(() => {
@@ -1371,28 +1431,7 @@ const GraphRenderer3D: React.FC<GraphRenderer3DProps> = ({
 
             return baseSize;
           })
-          .nodeColor((node: any) => {
-            // Phase 5 — colour overrides, evaluated each frame via refs.
-            // Priority: drop flash > saturation halo > role tint > user colour.
-            const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-            const lastFlash = dropFlashTimeRef.current.get(node.id);
-            if (lastFlash !== undefined && now - lastFlash < DROP_FLASH_MS) {
-              return '#ff1744'; // drop flash, red vif
-            }
-            const qStat = queueStatsByNodeRef.current.get(node.id);
-            if (qStat && node.queue_size && node.queue_size > 0) {
-              const ratio = qStat.size / node.queue_size;
-              if (ratio >= 1) return '#d32f2f'; // saturated
-              if (ratio > 0.8) return '#ff9800'; // near-saturated
-            }
-            // Role tint applied only when the user did not specify a colour,
-            // so explicit DOT colours are always preserved.
-            if (!node.color) {
-              if (node.nodeRole === 'generator') return '#80cbc4'; // teal
-              if (node.nodeRole === 'sink') return '#9fa8da'; // indigo
-            }
-            return node.color || '#4fc3f7';
-          })
+          .nodeColor((node: any) => resolveNodeColor(node))
           .nodeThreeObject(nodeThreeObjectCallback)
           .linkLabel((link: any) => showLinkText && link.name ? link.name : '')
           .linkThreeObjectExtend(true)
